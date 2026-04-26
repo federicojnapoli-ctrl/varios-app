@@ -1,0 +1,24 @@
+{
+  "name": "Control de Varios",
+  "short_name": "Varios 💰",
+  "description": "Tracker de gastos compartido en tiempo real",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f2340",
+  "theme_color": "#0f2340",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

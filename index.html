@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f2340">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Varios">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Varios 💰</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%230f2340'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #0f2340; --navy2: #1e3a5f; --navy3: #2d5282;
+  --green: #16a34a; --green-lt: #dcfce7;
+  --blue: #2563eb; --blue-lt: #dbeafe;
+  --amber: #d97706; --amber-lt: #fef3c7;
+  --red: #dc2626; --red-lt: #fee2e2;
+  --fede: #7c3aed; --fede-lt: #ede9fe;
+  --dai: #db2777;  --dai-lt: #fce7f3;
+  --surface: #f1f5f9; --card: #fff;
+  --border: #e2e8f0; --text: #1e293b; --muted: #64748b;
+  --safe-top: env(safe-area-inset-top,0px);
+  --safe-bot: env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);min-height:100vh;overscroll-behavior:none}
+
+/* HEADER */
+.header{background:linear-gradient(160deg,var(--navy) 0%,#1a2f5a 60%,var(--navy3) 100%);padding:calc(var(--safe-top) + 16px) 18px 18px;position:relative;overflow:hidden}
+.header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 80% 0%,rgba(245,158,11,.12) 0%,transparent 60%);pointer-events:none}
+.header-row1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.header-title{font-family:'Syne',sans-serif;font-size:21px;font-weight:800;color:#fff;letter-spacing:-.5px}
+.header-sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px}
+.mes-badge{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:5px 13px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.9);cursor:pointer}
+
+/* STATS GRID 2x2 */
+.hstats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hstat{background:rgba(255,255,255,.07);border-radius:12px;padding:10px 12px;border:1px solid rgba(255,255,255,.08)}
+.hstat-label{font-size:9px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.45);text-transform:uppercase;margin-bottom:4px}
+.hstat-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;line-height:1}
+
+/* USUARIO PILLS */
+.user-bar{display:flex;gap:8px;padding:12px 14px;background:var(--card);border-bottom:1px solid var(--border)}
+.user-pill{flex:1;padding:8px;border-radius:12px;border:2px solid var(--border);background:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center}
+.user-pill.fede{border-color:var(--fede);background:var(--fede-lt);color:var(--fede)}
+.user-pill.dai{border-color:var(--dai);background:var(--dai-lt);color:var(--dai)}
+.user-pill.inactive{border-color:var(--border);background:none;color:var(--muted)}
+
+/* MES SCROLLER */
+.mes-scroll{display:flex;gap:6px;overflow-x:auto;padding:8px 14px;background:var(--card);border-bottom:1px solid var(--border);scrollbar-width:none}
+.mes-scroll::-webkit-scrollbar{display:none}
+.mes-btn{flex-shrink:0;padding:5px 12px;border-radius:20px;border:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.mes-btn.active{background:var(--navy);color:#fff}
+.mes-btn:not(.active){background:var(--surface);color:var(--muted)}
+
+/* TABS */
+.tabs{display:flex;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.tab-btn{flex:1;padding:11px 4px;border:none;background:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .2s}
+.tab-btn.active{color:var(--navy);border-bottom-color:var(--navy)}
+
+/* CONTENT */
+.content{padding-bottom:calc(var(--safe-bot) + 60px)}
+
+/* CARDS */
+.card{background:var(--card);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin:12px 14px 0;padding:16px}
+.card-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+
+/* WEEK PILLS */
+.week-pills{display:flex;gap:8px;padding:10px 14px 0;flex-wrap:wrap}
+.week-pill{padding:7px 16px;border-radius:22px;border:none;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s}
+.week-pill.active{background:var(--navy);color:#fff;box-shadow:0 4px 12px rgba(15,35,64,.3)}
+.week-pill:not(.active){background:var(--border);color:var(--text)}
+
+/* STAT ROW */
+.stat-row{display:flex;gap:8px;margin:10px 14px 0}
+.stat-card{flex:1;background:var(--card);border-radius:14px;padding:11px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.stat-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.stat-val{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;line-height:1}
+
+/* PROGRESS */
+.prog-wrap{background:var(--border);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;border-radius:99px;transition:width .5s cubic-bezier(.34,1.56,.64,1)}
+
+/* SPLIT BAR - Fede vs Dai */
+.split-bar-wrap{margin:10px 0}
+.split-bar-track{height:12px;border-radius:99px;overflow:hidden;display:flex;background:var(--border);margin:6px 0}
+.split-bar-fede{background:var(--fede);border-radius:99px 0 0 99px;transition:width .5s}
+.split-bar-dai{background:var(--dai);border-radius:0 99px 99px 0;transition:width .5s}
+.split-legend{display:flex;justify-content:space-between;font-size:12px}
+.split-legend-item{display:flex;align-items:center;gap:5px}
+.split-dot{width:8px;height:8px;border-radius:50%}
+
+/* FORM */
+.form-input{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:11px;font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--surface);outline:none;transition:border .2s}
+.form-input:focus{border-color:var(--navy3);background:#fff}
+.form-row{display:flex;gap:8px;margin-top:8px}
+.cat-select{flex:1;padding:11px 13px;border:1.5px solid var(--border);border-radius:11px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--surface);color:var(--text);outline:none;appearance:none;cursor:pointer}
+.add-btn{width:100%;margin-top:10px;padding:13px;background:linear-gradient(135deg,var(--navy2),var(--navy));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(15,35,64,.25);transition:transform .15s,opacity .15s;-webkit-appearance:none}
+.add-btn:active{transform:scale(.98);opacity:.9}
+.add-btn:disabled{opacity:.5;pointer-events:none}
+
+/* GASTO ROWS */
+.gasto-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--surface)}
+.gasto-row:last-child{border-bottom:none}
+.cat-dot{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex-shrink:0}
+.gasto-info{flex:1;min-width:0}
+.gasto-desc{font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gasto-meta{font-size:11px;color:var(--muted);margin-top:1px;display:flex;align-items:center;gap:5px}
+.user-badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:700}
+.gasto-monto{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--navy);white-space:nowrap}
+.del-btn{background:none;border:none;color:#cbd5e1;font-size:15px;cursor:pointer;padding:2px 4px;flex-shrink:0}
+.del-btn:active{color:var(--red)}
+
+/* AHORRO */
+.ahorro-card{margin:12px 14px 0;padding:20px;background:linear-gradient(140deg,var(--navy) 0%,#1a3060 50%,var(--navy3) 100%);border-radius:18px;position:relative;overflow:hidden;box-shadow:0 8px 24px rgba(15,35,64,.35)}
+.ahorro-card::after{content:'💰';position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:52px;opacity:.12}
+.ahorro-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px}
+.ahorro-val{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:#86efac}
+.ahorro-pct{font-size:14px;color:rgba(255,255,255,.7);margin-top:4px}
+.ahorro-split{display:flex;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)}
+.ahorro-split-item{font-size:12px;color:rgba(255,255,255,.65)}
+.ahorro-split-item span{font-weight:700;color:rgba(255,255,255,.9);display:block;font-size:14px}
+
+/* GUIA */
+.guia-cat{border-radius:14px;padding:14px;margin-bottom:10px}
+.guia-tag{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.rutina-row{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--surface);align-items:flex-start}
+.warn-card{background:#fefce8;border:1px solid #fde047;border-radius:14px;padding:14px;margin:12px 14px 0}
+
+/* SYNC STATUS */
+.sync-bar{display:flex;align-items:center;justify-content:center;gap:6px;padding:6px;background:var(--card);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.sync-dot.ok{background:var(--green)}
+.sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite}
+.sync-dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* MODAL MES */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,35,64,.6);backdrop-filter:blur(4px);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--card);border-radius:20px 20px 0 0;padding:20px 20px calc(var(--safe-bot) + 20px);width:100%;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.2,.64,1)}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:99px;margin:0 auto 16px}
+.mes-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.mes-option{padding:10px 6px;border-radius:12px;border:1.5px solid var(--border);background:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s}
+.mes-option.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+/* TOAST */
+.toast{position:fixed;bottom:calc(var(--safe-bot) + 80px);left:50%;transform:translateX(-50%) translateY(10px);background:var(--navy);color:#fff;padding:10px 20px;border-radius:22px;font-size:13px;font-weight:600;z-index:300;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:30px;color:var(--muted);font-size:13px}
+.spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--navy2);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.empty{text-align:center;padding:28px 20px;color:var(--muted);font-size:14px}
+.empty-icon{font-size:34px;margin-bottom:8px}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="loading" style="min-height:100vh;flex-direction:column">
+    <div class="spin"></div>
+    <div>Cargando...</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="mesModal" onclick="if(event.target===this)closeMesModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;margin-bottom:14px">Seleccionar mes</div>
+    <div class="mes-grid" id="mesGrid"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// CONFIG — Spreadsheet ID del sheet creado en Drive
+// ══════════════════════════════════════════════════════
+const SHEET_ID = '1x3FVibkIEfbv40CPP0WQEfoWPA-LqCtrAtfn1RlwCqU';
+const SHEET_NAME = 'Gastos';
+const PRESUPUESTO = 1_500_000;
+const SEMANAL = 375_000;
+const INGRESOS = 4_863_083;
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const MESES_S = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const USUARIOS = { fede: { label:'Fede', color:'var(--fede)', bg:'var(--fede-lt)' }, dai: { label:'Dai', color:'var(--dai)', bg:'var(--dai-lt)' } };
+const CATS = {
+  A:{ label:'Esenciales', color:'#16a34a', bg:'#dcfce7', tope:.65 },
+  B:{ label:'Personal/Hogar', color:'#2563eb', bg:'#dbeafe', tope:.15 },
+  C:{ label:'Consumos extras', color:'#d97706', bg:'#fef3c7', tope:.20 },
+};
+
+// ══════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════
+let usuarioActivo = localStorage.getItem('usuario') || null;
+let mesActivo = new Date().getMonth();
+let semActiva = 1;
+let tabActiva = 'semana';
+let gastos = [];       // [{id,usuario,mes,semana,desc,cat,monto,fecha,ts}]
+let syncStatus = 'ok'; // ok | syncing | err
+let lastSync = null;
+let accessToken = null;
+let syncTimer = null;
+
+// ══════════════════════════════════════════════════════
+// SERVICE WORKER (PWA para Android/iOS)
+// ══════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+}
+
+// ══════════════════════════════════════════════════════
+// GOOGLE SHEETS API — via fetch con token OAuth de GIS
+// ══════════════════════════════════════════════════════
+function getToken() {
+  return new Promise((resolve, reject) => {
+    if (accessToken) { resolve(accessToken); return; }
+    // Carga Google Identity Services
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.onload = () => {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: '777551994272-pt905gviok1nni2rkoh9q16a7h2q59tf.apps.googleusercontent.com',
+        scope: 'https://www.googleapis.com/auth/spreadsheets',
+        callback: (r) => {
+          if (r.error) { reject(r.error); return; }
+          accessToken = r.access_token;
+          setTimeout(() => { accessToken = null; }, 3500000);
+          resolve(accessToken);
+        },
+      });
+      client.requestAccessToken();
+    };
+    script.onerror = () => reject('No se pudo cargar Google Auth');
+    document.head.appendChild(script);
+  });
+}
+
+async function sheetsRead() {
+  const token = await getToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A:H')}`;
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) throw new Error('Sheets read error ' + r.status);
+  const d = await r.json();
+  return (d.values || []).slice(1).map(row => ({
+    id: row[0], usuario: row[1], mes: +row[2], semana: +row[3],
+    desc: row[4], cat: row[5], monto: +row[6], fecha: row[7] || '',
+  }));
+}
+
+async function sheetsAppend(gasto) {
+  const token = await getToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A:H')}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+  const row = [gasto.id, gasto.usuario, gasto.mes, gasto.semana, gasto.desc, gasto.cat, gasto.monto, gasto.fecha];
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [row] }),
+  });
+  if (!r.ok) throw new Error('Sheets append error ' + r.status);
+}
+
+async function sheetsDelete(id) {
+  // Encontramos la fila y la borramos con batchUpdate
+  const token = await getToken();
+  // Primero leer para encontrar índice
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A:A')}`;
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  const d = await r.json();
+  const rows = d.values || [];
+  const rowIdx = rows.findIndex(r => r[0] === String(id));
+  if (rowIdx === -1) return;
+
+  // Obtener sheetId interno
+  const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`, { headers: { Authorization: 'Bearer ' + token } });
+  const meta = await metaR.json();
+  const sheetId = meta.sheets[0].properties.sheetId;
+
+  const delR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId, dimension: 'ROWS', startIndex: rowIdx, endIndex: rowIdx + 1 } } }] }),
+  });
+  if (!delR.ok) throw new Error('Delete error');
+}
+
+async function sheetsInitHeader() {
+  // Pone encabezados si la hoja está vacía
+  try {
+    const token = await getToken();
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A1:H1')}`;
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    const d = await r.json();
+    if (!d.values || !d.values.length) {
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A1:H1')}?valueInputOption=RAW`, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [['ID','Usuario','Mes','Semana','Descripcion','Categoria','Monto','Fecha']] }),
+      });
+    }
+  } catch(e) { console.warn('Header init:', e); }
+}
+
+// ══════════════════════════════════════════════════════
+// SYNC
+// ══════════════════════════════════════════════════════
+async function syncLoad(silent=false) {
+  try {
+    if (!silent) { syncStatus = 'syncing'; renderSyncBar(); }
+    gastos = await sheetsRead();
+    syncStatus = 'ok';
+    lastSync = new Date();
+    render();
+  } catch(e) {
+    syncStatus = 'err';
+    console.error('Sync error:', e);
+    if (!silent) showToast('⚠️ Error al sincronizar');
+    renderSyncBar();
+  }
+}
+
+function startAutoSync() {
+  if (syncTimer) clearInterval(syncTimer);
+  syncTimer = setInterval(() => syncLoad(true), 15000); // cada 15s
+}
+
+function renderSyncBar() {
+  const el = document.getElementById('sync-bar');
+  if (!el) return;
+  const map = { ok:'ok', syncing:'syncing', err:'err' };
+  const labels = { ok: lastSync ? `Sync ${lastSync.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}` : 'Sincronizado', syncing:'Sincronizando...', err:'Sin conexión' };
+  el.innerHTML = `<div class="sync-dot ${map[syncStatus]}"></div><span>${labels[syncStatus]}</span><button onclick="syncLoad()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted)">↺ Actualizar</button>`;
+}
+
+// ══════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════
+const fmt = n => (n<0?'-$':'$') + Math.abs(Math.round(n)).toLocaleString('es-AR');
+const pct = (v,t) => t>0 ? Math.min(100,Math.round(v/t*100)) : 0;
+
+function filtrar(mes, sem, usuario=null) {
+  return gastos.filter(g => g.mes===mes && g.semana===sem && (!usuario || g.usuario===usuario));
+}
+function filtrarMes(mes, usuario=null) {
+  return gastos.filter(g => g.mes===mes && (!usuario || g.usuario===usuario));
+}
+function totalOf(arr) { return arr.reduce((a,g)=>a+g.monto,0); }
+
+// ══════════════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+// ══════════════════════════════════════════════════════
+// MES MODAL
+// ══════════════════════════════════════════════════════
+function openMesModal() {
+  document.getElementById('mesGrid').innerHTML = MESES.map((m,i)=>
+    `<button class="mes-option ${i===mesActivo?'active':''}" onclick="selectMes(${i})">${m.slice(0,3)}</button>`
+  ).join('');
+  document.getElementById('mesModal').classList.add('open');
+}
+function closeMesModal() { document.getElementById('mesModal').classList.remove('open'); }
+function selectMes(i) { mesActivo=i; semActiva=1; closeMesModal(); render(); }
+
+// ══════════════════════════════════════════════════════
+// ADD / DELETE
+// ══════════════════════════════════════════════════════
+async function addGasto() {
+  if (!usuarioActivo) { showToast('⚠️ Primero seleccioná quién sos'); return; }
+  const desc = document.getElementById('inp-desc').value.trim();
+  const cat = document.getElementById('inp-cat').value;
+  const monto = parseFloat(document.getElementById('inp-monto').value.replace(/\./g,'').replace(',','.'));
+  if (!desc || isNaN(monto) || monto<=0) { showToast('⚠️ Completá todos los campos'); return; }
+
+  const btn = document.getElementById('add-btn');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  const g = { id: Date.now().toString(), usuario: usuarioActivo, mes: mesActivo, semana: semActiva, desc, cat, monto, fecha: new Date().toLocaleDateString('es-AR') };
+
+  try {
+    await sheetsAppend(g);
+    gastos.push(g);
+    document.getElementById('inp-desc').value = '';
+    document.getElementById('inp-monto').value = '';
+    showToast(`✅ ${fmt(monto)} guardado`);
+    render();
+  } catch(e) {
+    showToast('❌ Error al guardar. Reintentando...');
+    console.error(e);
+    // Reintentar login y guardar
+    accessToken = null;
+    try {
+      await sheetsAppend(g);
+      gastos.push(g);
+      document.getElementById('inp-desc').value='';
+      document.getElementById('inp-monto').value='';
+      showToast(`✅ ${fmt(monto)} guardado`);
+      render();
+    } catch(e2) { showToast('❌ No se pudo guardar'); }
+  } finally {
+    const b2 = document.getElementById('add-btn');
+    if(b2){ b2.disabled=false; b2.textContent='Registrar gasto'; }
+  }
+}
+
+async function delGasto(id) {
+  if (!confirm('¿Eliminar este gasto?')) return;
+  try {
+    syncStatus='syncing'; renderSyncBar();
+    await sheetsDelete(id);
+    gastos = gastos.filter(g => g.id !== String(id) && g.id !== id);
+    syncStatus='ok'; lastSync=new Date();
+    showToast('🗑 Gasto eliminado');
+    render();
+  } catch(e) {
+    syncStatus='err'; renderSyncBar();
+    showToast('❌ Error al eliminar');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER PRINCIPAL
+// ══════════════════════════════════════════════════════
+function render() {
+  if (!usuarioActivo) { renderLogin(); return; }
+
+  const gsMes = filtrarMes(mesActivo);
+  const gsSem = filtrar(mesActivo, semActiva);
+  const totMes = totalOf(gsMes);
+  const totSem = totalOf(gsSem);
+  const saldoMes = PRESUPUESTO - totMes;
+  const saldoSem = SEMANAL - totSem;
+  const ahorroProy = Math.max(0, saldoMes);
+  const pctAhorro = pct(ahorroProy, INGRESOS);
+
+  // Stats por usuario
+  const totFede = totalOf(filtrarMes(mesActivo,'fede'));
+  const totDai = totalOf(filtrarMes(mesActivo,'dai'));
+  const totFedeSem = totalOf(filtrar(mesActivo,semActiva,'fede'));
+  const totDaiSem = totalOf(filtrar(mesActivo,semActiva,'dai'));
+
+  const headerSaldoColor = saldoMes<0?'#fca5a5':totMes>PRESUPUESTO*.85?'#fde68a':'#86efac';
+
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="header-row1">
+        <div>
+          <div class="header-title">Control de Varios</div>
+          <div class="header-sub">$1.500.000/mes · $375.000/sem</div>
+        </div>
+        <button class="mes-badge" onclick="openMesModal()">${MESES_S[mesActivo]} ▾</button>
+      </div>
+      <div class="hstats">
+        <div class="hstat">
+          <div class="hstat-label">Gastado mes</div>
+          <div class="hstat-val" style="color:${totMes>PRESUPUESTO?'#fca5a5':'#fff'}">${fmt(totMes)}</div>
+        </div>
+        <div class="hstat">
+          <div class="hstat-label">Saldo mes</div>
+          <div class="hstat-val" style="color:${headerSaldoColor}">${fmt(saldoMes)}</div>
+        </div>
+        <div class="hstat">
+          <div class="hstat-label">Gastado semana</div>
+          <div class="hstat-val" style="color:${totSem>SEMANAL?'#fca5a5':'#fff'}">${fmt(totSem)}</div>
+        </div>
+        <div class="hstat">
+          <div class="hstat-label">Ahorro proy.</div>
+          <div class="hstat-val" style="color:#fde68a">${pctAhorro}%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SYNC BAR -->
+    <div class="sync-bar" id="sync-bar"></div>
+
+    <!-- USUARIO -->
+    <div class="user-bar">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);align-self:center;margin-right:4px">Soy:</div>
+      <button class="user-pill ${usuarioActivo==='fede'?'fede':'inactive'}" onclick="setUsuario('fede')">
+        👤 Fede ${usuarioActivo==='fede'?'✓':''}
+      </button>
+      <button class="user-pill ${usuarioActivo==='dai'?'dai':'inactive'}" onclick="setUsuario('dai')">
+        👤 Dai ${usuarioActivo==='dai'?'✓':''}
+      </button>
+    </div>
+
+    <!-- MES SCROLL -->
+    <div class="mes-scroll">
+      ${MESES_S.map((m,i)=>`<button class="mes-btn ${i===mesActivo?'active':''}" onclick="selectMes(${i})">${m}</button>`).join('')}
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab-btn ${tabActiva==='semana'?'active':''}" onclick="setTab('semana')">📅 Semana</button>
+      <button class="tab-btn ${tabActiva==='mes'?'active':''}" onclick="setTab('mes')">📊 Mes</button>
+      <button class="tab-btn ${tabActiva==='guia'?'active':''}" onclick="setTab('guia')">🗂 Guía</button>
+    </div>
+
+    <div class="content">
+      ${tabActiva==='semana' ? renderSemana(gsSem,totSem,saldoSem,totFedeSem,totDaiSem) : ''}
+      ${tabActiva==='mes' ? renderMes(gsMes,totMes,saldoMes,ahorroProy,pctAhorro,totFede,totDai) : ''}
+      ${tabActiva==='guia' ? renderGuia() : ''}
+    </div>
+  `;
+
+  renderSyncBar();
+
+  // Scroll mes activo visible
+  setTimeout(()=>{
+    const el = document.querySelector('.mes-scroll .mes-btn.active');
+    if(el) el.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  },50);
+}
+
+// ── LOGIN ──
+function renderLogin() {
+  document.getElementById('app').innerHTML = `
+    <div style="min-height:100vh;background:linear-gradient(160deg,var(--navy) 0%,var(--navy3) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px">
+      <div style="font-size:64px;margin-bottom:20px">💰</div>
+      <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:#fff;margin-bottom:8px;text-align:center">Control de Varios</div>
+      <div style="font-size:14px;color:rgba(255,255,255,.55);margin-bottom:40px;text-align:center">Gasto compartido en tiempo real</div>
+      <div style="font-size:14px;color:rgba(255,255,255,.7);margin-bottom:16px;font-weight:600">¿Quién sos?</div>
+      <div style="display:flex;gap:12px;width:100%;max-width:280px">
+        <button onclick="setUsuario('fede')" style="flex:1;padding:18px;background:var(--fede-lt);border:2px solid var(--fede);border-radius:16px;cursor:pointer;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--fede)">
+          👤<br>Fede
+        </button>
+        <button onclick="setUsuario('dai')" style="flex:1;padding:18px;background:var(--dai-lt);border:2px solid var(--dai);border-radius:16px;cursor:pointer;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--dai)">
+          👤<br>Dai
+        </button>
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:32px;text-align:center">Los datos se sincronizan automáticamente<br>entre ambos celulares</div>
+    </div>
+  `;
+}
+
+function setUsuario(u) {
+  usuarioActivo = u;
+  localStorage.setItem('usuario', u);
+  // Primero inicializar headers y luego cargar
+  sheetsInitHeader().then(() => syncLoad()).catch(() => syncLoad());
+  render();
+}
+
+function setTab(t) { tabActiva=t; render(); }
+
+// ── SEMANA ──
+function renderSemana(gs, totSem, saldoSem, totFedeSem, totDaiSem) {
+  const pctSem = pct(totSem, SEMANAL);
+  const barColor = totSem>SEMANAL?'var(--red)':totSem>SEMANAL*.8?'#f59e0b':'var(--green)';
+  const pctFede = totSem>0?pct(totFedeSem,totSem):50;
+  const pctDai = 100-pctFede;
+
+  return `
+    <div class="week-pills">
+      ${[1,2,3,4].map(s=>`<button class="week-pill ${s===semActiva?'active':''}" onclick="setSem(${s})">Sem ${s}</button>`).join('')}
+    </div>
+
+    <!-- STATS SEMANA -->
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-label">Total sem</div>
+        <div class="stat-val" style="color:${totSem>SEMANAL?'var(--red)':'var(--navy)'}">${fmt(totSem)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Disponible</div>
+        <div class="stat-val" style="color:${saldoSem<0?'var(--red)':'var(--green)'}">${fmt(saldoSem)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Por persona</div>
+        <div class="stat-val">${fmt(Math.max(0,saldoSem/2))}</div>
+      </div>
+    </div>
+
+    <!-- BARRA PROGRESO TOTAL -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px">
+        <span style="font-weight:600">Semana ${semActiva} · ${MESES[mesActivo]}</span>
+        <span style="color:var(--muted)">${pctSem}% usado</span>
+      </div>
+      <div class="prog-wrap" style="height:10px">
+        <div class="prog-fill" style="width:${pctSem}%;background:${barColor}"></div>
+      </div>
+      ${totSem>SEMANAL?`<div style="font-size:12px;color:var(--red);margin-top:6px;font-weight:600">⚠️ Excedido por ${fmt(totSem-SEMANAL)}</div>`:''}
+
+      <!-- SPLIT FEDE vs DAI -->
+      ${totSem>0?`
+      <div class="split-bar-wrap" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--surface)">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Quién gastó</div>
+        <div class="split-bar-track">
+          <div class="split-bar-fede" style="width:${pctFede}%"></div>
+          <div class="split-bar-dai" style="width:${pctDai}%"></div>
+        </div>
+        <div class="split-legend">
+          <div class="split-legend-item">
+            <div class="split-dot" style="background:var(--fede)"></div>
+            <span style="font-size:12px;font-weight:600;color:var(--fede)">Fede ${fmt(totFedeSem)}</span>
+            <span style="font-size:11px;color:var(--muted)">(${pctFede}%)</span>
+          </div>
+          <div class="split-legend-item">
+            <div class="split-dot" style="background:var(--dai)"></div>
+            <span style="font-size:12px;font-weight:600;color:var(--dai)">Dai ${fmt(totDaiSem)}</span>
+            <span style="font-size:11px;color:var(--muted)">(${pctDai}%)</span>
+          </div>
+        </div>
+      </div>`:''}
+    </div>
+
+    <!-- FORM -->
+    <div class="card">
+      <div class="card-label" style="display:flex;align-items:center;gap:6px">
+        ➕ Agregar como
+        <span style="font-weight:700;color:${usuarioActivo==='fede'?'var(--fede)':'var(--dai)'}">${usuarioActivo==='fede'?'Fede':'Dai'}</span>
+      </div>
+      <input class="form-input" id="inp-desc" placeholder="Ej: Coto, Uber, Heladería..."
+        onkeydown="if(event.key==='Enter')document.getElementById('inp-monto').focus()">
+      <div class="form-row">
+        <select class="cat-select" id="inp-cat">
+          <option value="A">A · Esenciales</option>
+          <option value="B">B · Personal</option>
+          <option value="C">C · Extras</option>
+        </select>
+        <input class="form-input" id="inp-monto" placeholder="Monto $" type="number" inputmode="decimal" style="flex:1"
+          onkeydown="if(event.key==='Enter')addGasto()">
+      </div>
+      <button class="add-btn" id="add-btn" onclick="addGasto()">Registrar gasto</button>
+    </div>
+
+    <!-- LISTA -->
+    ${gs.length>0?`
+    <div class="card">
+      <div class="card-label">Gastos semana ${semActiva} · ${gs.length} registros</div>
+      ${gs.slice().reverse().map(g=>`
+        <div class="gasto-row">
+          <div class="cat-dot" style="background:${CATS[g.cat]?.bg||'#f3f4f6'};color:${CATS[g.cat]?.color||'#374151'}">${g.cat}</div>
+          <div class="gasto-info">
+            <div class="gasto-desc">${g.desc}</div>
+            <div class="gasto-meta">
+              <span class="user-badge" style="background:${g.usuario==='fede'?'var(--fede-lt)':'var(--dai-lt)'};color:${g.usuario==='fede'?'var(--fede)':'var(--dai)'}">
+                ${g.usuario==='fede'?'Fede':'Dai'}
+              </span>
+              ${g.fecha}
+            </div>
+          </div>
+          <div class="gasto-monto">${fmt(g.monto)}</div>
+          ${g.usuario===usuarioActivo?`<button class="del-btn" onclick="delGasto('${g.id}')">✕</button>`:'<div style="width:22px"></div>'}
+        </div>
+      `).join('')}
+    </div>
+    `:`<div class="empty"><div class="empty-icon">📝</div>Sin gastos esta semana</div>`}
+  `;
+}
+
+function setSem(s) { semActiva=s; render(); }
+
+// ── MES ──
+function renderMes(gm, totMes, saldoMes, ahorroProy, pctAhorro, totFede, totDai) {
+  const pctMes = pct(totMes, PRESUPUESTO);
+  const totCat = {A:0,B:0,C:0};
+  gm.forEach(g=>{totCat[g.cat]=(totCat[g.cat]||0)+g.monto;});
+
+  const pctF = totMes>0?pct(totFede,totMes):50;
+  const pctD = 100-pctF;
+
+  const catBars = ['A','B','C'].map(c=>{
+    const cat=CATS[c], g=totCat[c]||0, t=PRESUPUESTO*cat.tope, p=pct(g,t), over=g>t;
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span style="font-weight:700;color:${cat.color}">${c}: ${cat.label}</span>
+        <span style="color:${over?'var(--red)':'var(--muted)'}">
+          ${fmt(g)} / ${fmt(t)} ${over?'⚠️':''}
+        </span>
+      </div>
+      <div class="prog-wrap" style="height:8px">
+        <div class="prog-fill" style="width:${p}%;background:${over?'var(--red)':cat.color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const semRows = [1,2,3,4].map(s=>{
+    const gs=filtrar(mesActivo,s), tot=totalOf(gs), p=pct(tot,SEMANAL);
+    const gF=totalOf(filtrar(mesActivo,s,'fede')), gD=totalOf(filtrar(mesActivo,s,'dai'));
+    const pF=tot>0?pct(gF,tot):0, pD=tot>0?pct(gD,tot):0;
+    return `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+        <span style="font-weight:600">Semana ${s}</span>
+        <span style="color:${tot>SEMANAL?'var(--red)':'var(--muted)'};font-weight:600">${fmt(tot)}</span>
+      </div>
+      <div class="prog-wrap" style="height:7px;margin-bottom:6px">
+        <div class="prog-fill" style="width:${p}%;background:${tot>SEMANAL?'var(--red)':'var(--navy2)'}"></div>
+      </div>
+      ${tot>0?`<div class="split-bar-track" style="height:5px;border-radius:99px">
+        <div style="width:${pF}%;background:var(--fede);border-radius:99px 0 0 99px"></div>
+        <div style="width:${pD}%;background:var(--dai);border-radius:0 99px 99px 0"></div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="card-label">Resumen ${MESES[mesActivo]}</div>
+      <div style="display:flex;gap:14px;margin-bottom:14px">
+        <div><div style="font-size:11px;color:var(--muted)">Presupuesto</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800">${fmt(PRESUPUESTO)}</div></div>
+        <div><div style="font-size:11px;color:var(--muted)">Gastado</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:${totMes>PRESUPUESTO?'var(--red)':'var(--navy)'}">${fmt(totMes)}</div></div>
+        <div><div style="font-size:11px;color:var(--muted)">Saldo</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:${saldoMes<0?'var(--red)':'var(--green)'}">${fmt(saldoMes)}</div></div>
+      </div>
+      <div class="prog-wrap" style="height:10px">
+        <div class="prog-fill" style="width:${pctMes}%;background:${totMes>PRESUPUESTO?'var(--red)':'var(--navy)'}"></div>
+      </div>
+      <div style="text-align:right;font-size:12px;color:var(--muted);margin-top:4px">${pctMes}% del presupuesto</div>
+    </div>
+
+    <!-- SPLIT MENSUAL FEDE vs DAI -->
+    ${totMes>0?`
+    <div class="card">
+      <div class="card-label">Fede vs Dai — mes completo</div>
+      <div class="split-bar-track" style="height:14px;margin-bottom:10px">
+        <div style="width:${pctF}%;background:var(--fede);border-radius:${pctD>0?'99px 0 0 99px':'99px'}"></div>
+        <div style="width:${pctD}%;background:var(--dai);border-radius:${pctF>0?'0 99px 99px 0':'99px'}"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <div style="text-align:center">
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--fede)">${fmt(totFede)}</div>
+          <div style="font-size:11px;color:var(--muted)">Fede · ${pctF}%</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--dai)">${fmt(totDai)}</div>
+          <div style="font-size:11px;color:var(--muted)">Dai · ${pctD}%</div>
+        </div>
+      </div>
+    </div>`:''}
+
+    <!-- CATEGORÍAS -->
+    <div class="card">
+      <div class="card-label">Distribución A · B · C</div>
+      ${catBars}
+    </div>
+
+    <!-- AHORRO -->
+    <div class="ahorro-card">
+      <div class="ahorro-label">Ahorro proyectado</div>
+      <div class="ahorro-val">${fmt(ahorroProy)}</div>
+      <div class="ahorro-pct">${pctAhorro}% del ingreso neto</div>
+      <div class="ahorro-split">
+        <div class="ahorro-split-item"><span>${fmt(ahorroProy*.7)}</span>70% → USD</div>
+        <div class="ahorro-split-item"><span>${fmt(ahorroProy*.3)}</span>30% → Fondo MM</div>
+      </div>
+    </div>
+
+    <!-- SEMANAS -->
+    <div class="card">
+      <div class="card-label">Semana a semana</div>
+      ${semRows}
+    </div>
+  `;
+}
+
+// ── GUÍA ──
+function renderGuia() {
+  const ejemplos = {
+    A:['Supermercado','Farmacia','Nafta/transporte','Verdulería','Médico'],
+    B:['Ropa','Calzado','Artículos hogar','Regalos','Librería'],
+    C:['Salida a comer','Delivery','Café','Cine','Imprevistos'],
+  };
+  const catCards = Object.entries(CATS).map(([k,v])=>`
+    <div class="guia-cat" style="background:${v.bg};border-left:4px solid ${v.color}">
+      <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:${v.color};margin-bottom:4px">
+        ${k}: ${v.label} — ${Math.round(v.tope*100)}% (${fmt(PRESUPUESTO*v.tope)}/mes)
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
+        ${ejemplos[k].map(e=>`<span class="guia-tag" style="background:#fff;border:1px solid ${v.color}33;color:${v.color}">${e}</span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="card">
+      <div class="card-label">Categorías A · B · C</div>
+      ${catCards}
+    </div>
+    <div class="card">
+      <div class="card-label">💬 Regla del WhatsApp</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.5">Cuando mandan el gasto, agregan la letra al final. Después lo cargan acá.</p>
+      ${['"Coto $8.500 A"','"Zapatillas Cata $12.000 B"','"Jaya cena $15.000 C"'].map(e=>`<div style="font-family:monospace;background:var(--surface);padding:8px 12px;border-radius:8px;margin-bottom:6px;font-size:14px;color:var(--navy)">${e}</div>`).join('')}
+    </div>
+    <div class="card">
+      <div class="card-label">📅 Rutina</div>
+      ${[['🟢 Lun–Vie','Gastan y registran acá al momento (o del WhatsApp)'],['🔵 Domingo','Revisan el saldo de la semana juntos'],['💛 Fin de mes','Si sobra → 70% USD + 30% Fondo MM'],['🔴 Si se pasan','Bajan gasto C primero, luego B']].map(([d,t])=>`
+        <div class="rutina-row"><span style="font-size:12px;font-weight:700;min-width:80px">${d}</span><span style="font-size:13px;color:var(--muted);flex:1;line-height:1.4">${t}</span></div>
+      `).join('')}
+    </div>
+    <div class="warn-card">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:6px">⚠️ No van acá</div>
+      <div style="font-size:13px;color:#713f12;line-height:1.6">
+        <strong>Tarjetas</strong> (nafta en TC, streaming, cuotas) → van en Tarjetas Fede/Dai.<br>
+        <strong>Niñera, jardín, expensas</strong> → van en Casa/Cata.<br>
+        Solo lo que se paga en <strong>efectivo, débito o MP</strong>.
+      </div>
+    </div>
+    <div style="height:10px"></div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+if (usuarioActivo) {
+  sheetsInitHeader()
+    .then(() => syncLoad())
+    .catch(() => { gastos=[]; render(); });
+  startAutoSync();
+} else {
+  renderLogin();
+}
+</script>
+
+<!-- INSTRUCCIONES DE CONFIGURACIÓN (se ven solo en código, no en la app) -->
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  PASO ÚNICO PARA ACTIVAR TIEMPO REAL                        ║
+  ║                                                              ║
+  ║  1. Ir a: console.cloud.google.com                          ║
+  ║  2. Crear proyecto → Habilitar "Google Sheets API"           ║
+  ║  3. Credenciales → Crear ID de cliente OAuth                 ║
+  ║     Tipo: Aplicación web                                     ║
+  ║     Orígenes autorizados: file://                            ║
+  ║  4. Copiar el Client ID                                      ║
+  ║  5. En este archivo, reemplazar 'REEMPLAZAR_CLIENT_ID'       ║
+  ║     con el Client ID obtenido                                ║
+  ║  6. Compartir el Sheet con la cuenta de Dai también          ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+</body>
+</html>

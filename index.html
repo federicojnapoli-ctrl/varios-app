@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Varios 💰</title>
 <link rel="manifest" href="./manifest.json">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%230f2340'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%230f2340'/%3E%3Ctext x='256' y='340' font-size='300' text-anchor='middle' font-family='Apple Color Emoji%2C Segoe UI Emoji%2C Noto Color Emoji%2C sans-serif'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -162,6 +162,70 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text
 .empty{text-align:center;padding:28px 20px;color:var(--muted);font-size:14px}
 .empty-icon{font-size:34px;margin-bottom:8px}
 </style>
+<script>
+// Genera íconos PNG reales con emoji 💰 para Android PWA
+(function() {
+  function makeIcon(size) {
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      // Fondo navy
+      ctx.fillStyle = '#0f2340';
+      const r = size * 0.15;
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.lineTo(size - r, 0);
+      ctx.quadraticCurveTo(size, 0, size, r);
+      ctx.lineTo(size, size - r);
+      ctx.quadraticCurveTo(size, size, size - r, size);
+      ctx.lineTo(r, size);
+      ctx.quadraticCurveTo(0, size, 0, size - r);
+      ctx.lineTo(0, r);
+      ctx.quadraticCurveTo(0, 0, r, 0);
+      ctx.closePath();
+      ctx.fill();
+      // Emoji bolsa de dinero
+      ctx.font = (size * 0.58) + 'px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('💰', size / 2, size / 2 + size * 0.04);
+      return c.toDataURL('image/png');
+    } catch(e) { return null; }
+  }
+  window.addEventListener('load', () => {
+    // Actualizar links del manifest con íconos generados dinámicamente
+    const i192 = makeIcon(192);
+    const i512 = makeIcon(512);
+    if (!i192 || !i512) return;
+    // Parchear el manifest con blob URLs de los íconos reales
+    try {
+      const mf = {
+        name: "Control de Varios",
+        short_name: "Varios 💰",
+        start_url: "/varios-app/",
+        scope: "/varios-app/",
+        display: "standalone",
+        background_color: "#0f2340",
+        theme_color: "#0f2340",
+        orientation: "portrait",
+        icons: [
+          { src: i192, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+          { src: i512, sizes: "512x512", type: "image/png", purpose: "any maskable" }
+        ]
+      };
+      const blob = new Blob([JSON.stringify(mf)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      let link = document.querySelector('link[rel="manifest"]');
+      if (!link) { link = document.createElement('link'); link.rel = 'manifest'; document.head.appendChild(link); }
+      link.href = url;
+    } catch(e) {}
+    // Apple touch icon
+    const appleLink = document.querySelector('link[rel="apple-touch-icon"]');
+    if (appleLink) appleLink.href = i192;
+  });
+})();
+</script>
 </head>
 <body>
 
@@ -189,8 +253,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text
 const SHEET_ID = '1x3FVibkIEfbv40CPP0WQEfoWPA-LqCtrAtfn1RlwCqU';
 const SHEET_NAME = 'Hoja 1';
 const PRESUPUESTO = 1_500_000;
-const SEMANAL = 375_000;
-const INGRESOS = 4_863_083;
+const SEMANAL = 300_000; // 1.500.000 / 5 semanas
+const INGRESOS = 4_863_083; // Fede 1.863.083 + Dai 3.000.000
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MESES_S = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const USUARIOS = { fede: { label:'Fede', color:'var(--fede)', bg:'var(--fede-lt)' }, dai: { label:'Dai', color:'var(--dai)', bg:'var(--dai-lt)' } };
@@ -223,27 +287,61 @@ if ('serviceWorker' in navigator) {
 // ══════════════════════════════════════════════════════
 // GOOGLE SHEETS API — via fetch con token OAuth de GIS
 // ══════════════════════════════════════════════════════
+function loadGIS() {
+  return new Promise((res, rej) => {
+    if (window.google && window.google.accounts) { res(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = res;
+    s.onerror = () => rej('No se pudo cargar Google Auth');
+    document.head.appendChild(s);
+  });
+}
+
 function getToken() {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    // Si ya tenemos token en memoria, usarlo
     if (accessToken) { resolve(accessToken); return; }
-    // Carga Google Identity Services
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.onload = () => {
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: '777551994272-pt905gviok1nni2rkoh9q16a7h2q59tf.apps.googleusercontent.com',
-        scope: 'https://www.googleapis.com/auth/spreadsheets',
-        callback: (r) => {
-          if (r.error) { reject(r.error); return; }
-          accessToken = r.access_token;
-          setTimeout(() => { accessToken = null; }, 3500000);
-          resolve(accessToken);
-        },
-      });
-      client.requestAccessToken();
-    };
-    script.onerror = () => reject('No se pudo cargar Google Auth');
-    document.head.appendChild(script);
+
+    // Si hay token guardado en sessionStorage y no expiró, usarlo
+    const saved = sessionStorage.getItem('g_token');
+    const savedExp = parseInt(sessionStorage.getItem('g_token_exp') || '0');
+    if (saved && Date.now() < savedExp) {
+      accessToken = saved;
+      resolve(accessToken);
+      return;
+    }
+
+    try {
+      await loadGIS();
+    } catch(e) { reject(e); return; }
+
+    // Hint: cuenta guardada para skip del selector
+    const hint = localStorage.getItem('g_hint') || '';
+
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: '777551994272-pt905gviok1nni2rkoh9q16a7h2q59tf.apps.googleusercontent.com',
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      hint: hint,
+      prompt: hint ? '' : 'select_account', // sin prompt si ya conocemos la cuenta
+      callback: (r) => {
+        if (r.error) { reject(r.error); return; }
+        accessToken = r.access_token;
+        // Guardar en sessionStorage por ~55 minutos
+        const exp = Date.now() + 55 * 60 * 1000;
+        sessionStorage.setItem('g_token', accessToken);
+        sessionStorage.setItem('g_token_exp', exp.toString());
+        // Guardar hint de cuenta para la próxima vez
+        if (r.email) localStorage.setItem('g_hint', r.email);
+        setTimeout(() => {
+          accessToken = null;
+          sessionStorage.removeItem('g_token');
+          sessionStorage.removeItem('g_token_exp');
+        }, 3500000);
+        resolve(accessToken);
+      },
+    });
+    client.requestAccessToken();
   });
 }
 
@@ -463,7 +561,7 @@ function render() {
       <div class="header-row1">
         <div>
           <div class="header-title">Control de Varios</div>
-          <div class="header-sub">$1.500.000/mes · $375.000/sem</div>
+          <div class="header-sub">$1.500.000/mes · $300.000/sem</div>
         </div>
         <button class="mes-badge" onclick="openMesModal()">${MESES_S[mesActivo]} ▾</button>
       </div>
@@ -569,22 +667,30 @@ function renderSemana(gs, totSem, saldoSem, totFedeSem, totDaiSem) {
 
   return `
     <div class="week-pills">
-      ${[1,2,3,4].map(s=>`<button class="week-pill ${s===semActiva?'active':''}" onclick="setSem(${s})">Sem ${s}</button>`).join('')}
+      ${[1,2,3,4,5].map(s=>`<button class="week-pill ${s===semActiva?'active':''}" onclick="setSem(${s})">Sem ${s}</button>`).join('')}
     </div>
 
     <!-- STATS SEMANA -->
     <div class="stat-row">
       <div class="stat-card">
-        <div class="stat-label">Total sem</div>
+        <div class="stat-label">Gastado total</div>
         <div class="stat-val" style="color:${totSem>SEMANAL?'var(--red)':'var(--navy)'}">${fmt(totSem)}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Disponible</div>
+        <div class="stat-label">Saldo pareja</div>
         <div class="stat-val" style="color:${saldoSem<0?'var(--red)':'var(--green)'}">${fmt(saldoSem)}</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Por persona</div>
-        <div class="stat-val">${fmt(Math.max(0,saldoSem/2))}</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-card" style="border-left:3px solid var(--fede)">
+        <div class="stat-label" style="color:var(--fede)">Fede gastó</div>
+        <div class="stat-val" style="color:var(--fede)">${fmt(totFedeSem)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Le queda ${fmt(Math.max(0, SEMANAL/2 - totFedeSem))}</div>
+      </div>
+      <div class="stat-card" style="border-left:3px solid var(--dai)">
+        <div class="stat-label" style="color:var(--dai)">Dai gastó</div>
+        <div class="stat-val" style="color:var(--dai)">${fmt(totDaiSem)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Le queda ${fmt(Math.max(0, SEMANAL/2 - totDaiSem))}</div>
       </div>
     </div>
 
@@ -693,7 +799,7 @@ function renderMes(gm, totMes, saldoMes, ahorroProy, pctAhorro, totFede, totDai)
     </div>`;
   }).join('');
 
-  const semRows = [1,2,3,4].map(s=>{
+  const semRows = [1,2,3,4,5].map(s=>{
     const gs=filtrar(mesActivo,s), tot=totalOf(gs), p=pct(tot,SEMANAL);
     const gF=totalOf(filtrar(mesActivo,s,'fede')), gD=totalOf(filtrar(mesActivo,s,'dai'));
     const pF=tot>0?pct(gF,tot):0, pD=tot>0?pct(gD,tot):0;

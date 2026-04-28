@@ -267,7 +267,17 @@ const CATS = {
 // ══════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════
-let usuarioActivo = localStorage.getItem('usuario') || null;
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return m ? decodeURIComponent(m[2]) : null;
+}
+function setCookie(name, val) {
+  document.cookie = name + '=' + encodeURIComponent(val) + ';path=/;max-age=31536000;SameSite=Lax';
+}
+let usuarioActivo = localStorage.getItem('usuario') || getCookie('usuario') || null;
+if (usuarioActivo && !localStorage.getItem('usuario')) {
+  localStorage.setItem('usuario', usuarioActivo);
+}
 let mesActivo = new Date().getMonth();
 let semActiva = 1;
 let tabActiva = 'semana';
@@ -413,13 +423,44 @@ async function sheetsInitHeader() {
 // ══════════════════════════════════════════════════════
 // SYNC
 // ══════════════════════════════════════════════════════
+function preservarForm() {
+  const desc = document.getElementById('inp-desc');
+  const cat = document.getElementById('inp-cat');
+  const monto = document.getElementById('inp-monto');
+  return {
+    desc: desc ? desc.value : '',
+    cat: cat ? cat.value : 'A',
+    monto: monto ? monto.value : '',
+    focused: document.activeElement ? document.activeElement.id : null,
+  };
+}
+function restaurarForm(saved) {
+  if (!saved) return;
+  const desc = document.getElementById('inp-desc');
+  const cat = document.getElementById('inp-cat');
+  const monto = document.getElementById('inp-monto');
+  if (desc && saved.desc) desc.value = saved.desc;
+  if (cat && saved.cat) cat.value = saved.cat;
+  if (monto && saved.monto) monto.value = saved.monto;
+  if (saved.focused) {
+    const el = document.getElementById(saved.focused);
+    if (el) el.focus();
+  }
+}
+
 async function syncLoad(silent=false) {
   try {
     if (!silent) { syncStatus = 'syncing'; renderSyncBar(); }
+    const formState = silent ? preservarForm() : null;
     gastos = await sheetsRead();
     syncStatus = 'ok';
     lastSync = new Date();
+    if (silent && formState && (formState.desc || formState.monto || formState.focused)) {
+      renderSyncBar();
+      return;
+    }
     render();
+    if (formState) restaurarForm(formState);
   } catch(e) {
     syncStatus = 'err';
     console.error('Sync error:', e);
@@ -652,7 +693,7 @@ function renderLogin() {
 function setUsuario(u) {
   usuarioActivo = u;
   localStorage.setItem('usuario', u);
-  // Primero inicializar headers y luego cargar
+  setCookie('usuario', u);
   sheetsInitHeader().then(() => syncLoad()).catch(() => syncLoad());
   render();
 }
@@ -661,8 +702,28 @@ function setTab(t) { tabActiva=t; render(); }
 
 // ── SEMANA ──
 function renderSemana(gs, totSem, saldoSem, totFedeSem, totDaiSem) {
-  const pctSem = pct(totSem, SEMANAL);
-  const barColor = totSem>SEMANAL?'var(--red)':totSem>SEMANAL*.8?'#f59e0b':'var(--green)';
+  // Cálculo de exceso acumulado de semanas anteriores (mismo mes)
+  let excesoPareja = 0, excesoFede = 0, excesoDai = 0;
+  for (let s = 1; s < semActiva; s++) {
+    const semGs = filtrar(mesActivo, s);
+    const tot = totalOf(semGs);
+    const totF = totalOf(filtrar(mesActivo, s, 'fede'));
+    const totD = totalOf(filtrar(mesActivo, s, 'dai'));
+    if (tot > SEMANAL) excesoPareja += (tot - SEMANAL);
+    if (totF > SEMANAL/2) excesoFede += (totF - SEMANAL/2);
+    if (totD > SEMANAL/2) excesoDai += (totD - SEMANAL/2);
+  }
+  const topeSem = Math.max(0, SEMANAL - excesoPareja);
+  const topeFede = Math.max(0, (SEMANAL/2) - excesoFede);
+  const topeDai = Math.max(0, (SEMANAL/2) - excesoDai);
+  saldoSem = topeSem - totSem;
+  const ajusteFede = excesoFede;
+  const ajusteDai = excesoDai;
+  const ajustePareja = excesoPareja;
+  const sobraFede = topeFede - totFedeSem;
+  const sobraDai = topeDai - totDaiSem;
+  const pctSem = pct(totSem, topeSem || 1);
+  const barColor = totSem>topeSem?'var(--red)':totSem>topeSem*.8?'#f59e0b':'var(--green)';
   const pctFede = totSem>0?pct(totFedeSem,totSem):50;
   const pctDai = 100-pctFede;
 
@@ -672,24 +733,33 @@ function renderSemana(gs, totSem, saldoSem, totFedeSem, totDaiSem) {
     </div>
 
     <!-- STATS SEMANA -->
-    <!-- STATS: pareja + individuales -->
-    <div class="stat-row">
-      <div class="stat-card">
-        <div class="stat-label">💑 Pareja gastó</div>
-        <div class="stat-val" style="color:${totSem>SEMANAL?'var(--red)':'var(--navy)'}">${fmt(totSem)}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:3px">de ${fmt(SEMANAL)} · queda <strong style="color:${saldoSem<0?'var(--red)':'var(--green)'}">${fmt(saldoSem)}</strong></div>
+    <!-- TOPE INDIVIDUAL DESTACADO POR PERSONA -->
+    <div class="stat-row" style="margin-top:14px">
+      <div class="stat-card" style="border:2px solid var(--fede);background:linear-gradient(135deg,var(--fede-lt) 0%,#fff 100%);padding:16px 14px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--fede);text-transform:uppercase;margin-bottom:8px">👤 Fede · le queda</div>
+        <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;line-height:1;color:${(topeFede-totFedeSem)<0?'var(--red)':'var(--fede)'}">${fmt(Math.max(0,topeFede-totFedeSem))}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.3">Gastó ${fmt(totFedeSem)} de ${fmt(topeFede)}${ajusteFede>0?`<br><span style="color:var(--red);font-weight:600">−${fmt(ajusteFede)} por exceso</span>`:''}</div>
+      </div>
+      <div class="stat-card" style="border:2px solid var(--dai);background:linear-gradient(135deg,var(--dai-lt) 0%,#fff 100%);padding:16px 14px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--dai);text-transform:uppercase;margin-bottom:8px">👤 Dai · le queda</div>
+        <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;line-height:1;color:${(topeDai-totDaiSem)<0?'var(--red)':'var(--dai)'}">${fmt(Math.max(0,topeDai-totDaiSem))}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.3">Gastó ${fmt(totDaiSem)} de ${fmt(topeDai)}${ajusteDai>0?`<br><span style="color:var(--red);font-weight:600">−${fmt(ajusteDai)} por exceso</span>`:''}</div>
       </div>
     </div>
+
+    <!-- TOTAL PAREJA (resumen abajo) -->
     <div class="stat-row">
-      <div class="stat-card" style="border-left:3px solid var(--fede)">
-        <div class="stat-label" style="color:var(--fede)">👤 Fede</div>
-        <div class="stat-val" style="color:var(--fede)">${fmt(totFedeSem)}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:3px">de ${fmt(SEMANAL/2)} · le queda <strong style="color:${(SEMANAL/2-totFedeSem)<0?'var(--red)':'var(--green)'}">${fmt(Math.max(0,SEMANAL/2-totFedeSem))}</strong></div>
-      </div>
-      <div class="stat-card" style="border-left:3px solid var(--dai)">
-        <div class="stat-label" style="color:var(--dai)">👤 Dai</div>
-        <div class="stat-val" style="color:var(--dai)">${fmt(totDaiSem)}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:3px">de ${fmt(SEMANAL/2)} · le queda <strong style="color:${(SEMANAL/2-totDaiSem)<0?'var(--red)':'var(--green)'}">${fmt(Math.max(0,SEMANAL/2-totDaiSem))}</strong></div>
+      <div class="stat-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--muted);text-transform:uppercase">💑 Total pareja</div>
+            <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:${totSem>topeSem?'var(--red)':'var(--navy)'};margin-top:2px">${fmt(totSem)} <span style="font-size:13px;color:var(--muted);font-weight:600">de ${fmt(topeSem)}</span></div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:10px;color:var(--muted)">Queda</div>
+            <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:${saldoSem<0?'var(--red)':'var(--green)'}">${fmt(saldoSem)}</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -702,7 +772,8 @@ function renderSemana(gs, totSem, saldoSem, totFedeSem, totDaiSem) {
       <div class="prog-wrap" style="height:10px">
         <div class="prog-fill" style="width:${pctSem}%;background:${barColor}"></div>
       </div>
-      ${totSem>SEMANAL?`<div style="font-size:12px;color:var(--red);margin-top:6px;font-weight:600">⚠️ Excedido por ${fmt(totSem-SEMANAL)}</div>`:''}
+      ${totSem>topeSem?`<div style="font-size:12px;color:var(--red);margin-top:6px;font-weight:600">⚠️ Excedido por ${fmt(totSem-topeSem)}</div>`:''}
+      ${ajustePareja>0?`<div style="font-size:11px;color:var(--amber);margin-top:4px;font-weight:600">ℹ️ Tope reducido por ${fmt(ajustePareja)} de exceso en semanas previas</div>`:''}
 
       <!-- SPLIT FEDE vs DAI -->
       ${totSem>0?`
@@ -726,6 +797,20 @@ function renderSemana(gs, totSem, saldoSem, totFedeSem, totDaiSem) {
         </div>
       </div>`:''}
     </div>
+
+    <!-- AVISO LISTO PARA AHORRAR -->
+    ${(sobraFede > 0 || sobraDai > 0) ? `
+    <div class="card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;margin-top:12px;box-shadow:0 4px 14px rgba(16,185,129,.3)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="font-size:38px">💰</div>
+        <div style="flex:1">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.85)">Listo para ahorrar</div>
+          <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:#fff;line-height:1;margin-top:4px">${fmt(Math.max(0,sobraFede) + Math.max(0,sobraDai))}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.9);margin-top:6px">${sobraFede > 0 ? `Fede ${fmt(sobraFede)}` : ''}${sobraFede > 0 && sobraDai > 0 ? ' · ' : ''}${sobraDai > 0 ? `Dai ${fmt(sobraDai)}` : ''}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:6px;line-height:1.4">Transferí este monto al ahorro 💵 · No se acumula a la próxima semana</div>
+        </div>
+      </div>
+    </div>` : ''}
 
     <!-- FORM -->
     <div class="card">

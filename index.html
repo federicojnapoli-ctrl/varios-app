@@ -311,61 +311,81 @@ if ('serviceWorker' in navigator) {
 // ══════════════════════════════════════════════════════
 // GOOGLE SHEETS API — via fetch con token OAuth de GIS
 // ══════════════════════════════════════════════════════
+let _gisLoaded = false;
+let _tokenClient = null;
+let _pendingResolvers = [];
+
 function loadGIS() {
   return new Promise((res, rej) => {
-    if (window.google && window.google.accounts) { res(); return; }
+    if (_gisLoaded && window.google?.accounts) { res(); return; }
+    if (document.querySelector('script[src*="gsi/client"]')) {
+      const poll = setInterval(() => {
+        if (window.google?.accounts) { _gisLoaded=true; clearInterval(poll); res(); }
+      }, 100);
+      setTimeout(() => { clearInterval(poll); rej('GIS timeout'); }, 10000);
+      return;
+    }
     const s = document.createElement('script');
     s.src = 'https://accounts.google.com/gsi/client';
-    s.onload = res;
+    s.onload = () => { _gisLoaded=true; res(); };
     s.onerror = () => rej('No se pudo cargar Google Auth');
     document.head.appendChild(s);
   });
 }
 
+function guardarToken(token) {
+  accessToken = token;
+  const exp = Date.now() + 55*60*1000;
+  try {
+    sessionStorage.setItem('g_token', token);
+    sessionStorage.setItem('g_token_exp', String(exp));
+    localStorage.setItem('g_token_ls', token);
+    localStorage.setItem('g_token_ls_exp', String(exp));
+  } catch(e) {}
+  setTimeout(() => {
+    accessToken = null;
+    try { sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_token_exp'); } catch(e) {}
+  }, 55*60*1000);
+}
+
+function tokenGuardado() {
+  try {
+    const t=sessionStorage.getItem('g_token'), exp=parseInt(sessionStorage.getItem('g_token_exp')||'0');
+    if (t && Date.now()<exp) return t;
+    const tls=localStorage.getItem('g_token_ls'), expls=parseInt(localStorage.getItem('g_token_ls_exp')||'0');
+    if (tls && Date.now()<expls) return tls;
+  } catch(e) {}
+  return null;
+}
+
 function getToken() {
   return new Promise(async (resolve, reject) => {
-    // Si ya tenemos token en memoria, usarlo
     if (accessToken) { resolve(accessToken); return; }
-
-    // Si hay token guardado en sessionStorage y no expiró, usarlo
-    const saved = sessionStorage.getItem('g_token');
-    const savedExp = parseInt(sessionStorage.getItem('g_token_exp') || '0');
-    if (saved && Date.now() < savedExp) {
-      accessToken = saved;
-      resolve(accessToken);
-      return;
-    }
-
-    try {
-      await loadGIS();
-    } catch(e) { reject(e); return; }
-
-    // Hint: cuenta guardada para skip del selector
+    const saved = tokenGuardado();
+    if (saved) { accessToken=saved; resolve(accessToken); return; }
+    // Si ya hay un login en curso, encolar
+    if (_pendingResolvers.length > 0) { _pendingResolvers.push({resolve,reject}); return; }
+    _pendingResolvers.push({resolve,reject});
+    try { await loadGIS(); } catch(e) { _pendingResolvers.splice(0).forEach(p=>p.reject(e)); return; }
     const hint = localStorage.getItem('g_hint') || '';
-
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: '777551994272-pt905gviok1nni2rkoh9q16a7h2q59tf.apps.googleusercontent.com',
-      scope: 'https://www.googleapis.com/auth/spreadsheets',
-      hint: hint,
-      prompt: hint ? '' : 'select_account', // sin prompt si ya conocemos la cuenta
-      callback: (r) => {
-        if (r.error) { reject(r.error); return; }
-        accessToken = r.access_token;
-        // Guardar en sessionStorage por ~55 minutos
-        const exp = Date.now() + 55 * 60 * 1000;
-        sessionStorage.setItem('g_token', accessToken);
-        sessionStorage.setItem('g_token_exp', exp.toString());
-        // Guardar hint de cuenta para la próxima vez
-        if (r.email) localStorage.setItem('g_hint', r.email);
-        setTimeout(() => {
-          accessToken = null;
-          sessionStorage.removeItem('g_token');
-          sessionStorage.removeItem('g_token_exp');
-        }, 3500000);
-        resolve(accessToken);
-      },
-    });
-    client.requestAccessToken();
+    if (!_tokenClient) {
+      _tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: '777551994272-pt905gviok1nni2rkoh9q16a7h2q59tf.apps.googleusercontent.com',
+        scope: 'https://www.googleapis.com/auth/spreadsheets',
+        callback: (r) => {
+          const pending = _pendingResolvers.splice(0);
+          if (r.error) { pending.forEach(p=>p.reject(r.error)); return; }
+          guardarToken(r.access_token);
+          if (r.email) localStorage.setItem('g_hint', r.email);
+          pending.forEach(p=>p.resolve(r.access_token));
+        },
+      });
+    }
+    if (hint) {
+      _tokenClient.requestAccessToken({prompt:'', hint, login_hint:hint});
+    } else {
+      _tokenClient.requestAccessToken({prompt:'select_account'});
+    }
   });
 }
 
@@ -538,10 +558,9 @@ async function syncLoad(silent=false) {
   try {
     if (!silent) { syncStatus = 'syncing'; renderSyncBar(); }
     const formState = silent ? preservarForm() : null;
-    // Recargar presupuestos cada 5 sincronizaciones (~75 seg) para capturar cambios en la planilla
     if (!silent || !window._syncCount) window._syncCount = 0;
     window._syncCount++;
-    if (window._syncCount % 5 === 1) cargarPresupuestosPorMes().catch(()=>{}); // en paralelo
+    if (window._syncCount % 5 === 1) cargarPresupuestosPorMes().catch(()=>{});
     gastos = await sheetsRead();
     syncStatus = 'ok';
     lastSync = new Date();
@@ -552,9 +571,14 @@ async function syncLoad(silent=false) {
     render();
     if (formState) restaurarForm(formState);
   } catch(e) {
-    syncStatus = 'err';
     console.error('Sync error:', e);
-    if (!silent) showToast('⚠️ Error al sincronizar');
+    const msg = String(e).toLowerCase();
+    if (msg.includes('popup') || msg.includes('access') || msg.includes('token') || msg.includes('auth') || msg.includes('401') || msg.includes('403')) {
+      syncStatus = 'login';
+    } else {
+      syncStatus = 'err';
+      if (!silent) showToast('⚠️ Error al sincronizar');
+    }
     renderSyncBar();
   }
 }
@@ -567,9 +591,22 @@ function startAutoSync() {
 function renderSyncBar() {
   const el = document.getElementById('sync-bar');
   if (!el) return;
-  const map = { ok:'ok', syncing:'syncing', err:'err' };
+  if (syncStatus === 'login') {
+    el.innerHTML = `<div class="sync-dot err"></div><span style="color:var(--red);font-weight:600">Necesita autorización</span><button onclick="loginManual()" style="margin-left:auto;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">🔑 Conectar Google</button>`;
+    return;
+  }
   const labels = { ok: lastSync ? `Sync ${lastSync.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}` : 'Sincronizado', syncing:'Sincronizando...', err:'Sin conexión' };
-  el.innerHTML = `<div class="sync-dot ${map[syncStatus]}"></div><span>${labels[syncStatus]}</span><button onclick="syncLoad()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted)">↺ Actualizar</button>`;
+  el.innerHTML = `<div class="sync-dot ${syncStatus}"></div><span>${labels[syncStatus]||''}</span><button onclick="syncLoad()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted)">↺ Actualizar</button>`;
+}
+
+function loginManual() {
+  accessToken = null;
+  _tokenClient = null;
+  try {
+    sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_token_exp');
+    localStorage.removeItem('g_token_ls'); localStorage.removeItem('g_token_ls_exp');
+  } catch(e) {}
+  syncLoad(false);
 }
 
 // ══════════════════════════════════════════════════════

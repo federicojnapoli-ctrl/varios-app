@@ -370,65 +370,74 @@ function getToken() {
 }
 
 // Lee los presupuestos de Varios por mes desde la planilla Gastos 2026
+// NUNCA lanza excepción — usa fallback si falla
 async function cargarPresupuestosPorMes() {
+  // Valores reales de la planilla como fallback (actualizá estos si cambian)
+  const FALLBACK = [
+    2000000, // Ene
+    2948938, // Feb
+    1994667, // Mar
+    2456808, // Abr
+    1500000, // May
+    1500000, // Jun
+    1500000, // Jul
+    1500000, // Ago
+    1500000, // Sep
+    1500000, // Oct
+    1500000, // Nov
+    1500000, // Dic
+  ];
+
   try {
     const token = await getToken();
-    // Leer la pestaña "Varios" de la planilla Gastos 2026
-    // Buscamos la fila "Total Varios" o "Varios" y tomamos los 12 meses
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${GASTOS_SHEET_ID}/values/${encodeURIComponent('Varios!A:N')}`;
-    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-    if (!r.ok) throw new Error('No se pudo leer presupuestos');
-    const d = await r.json();
-    const rows = d.values || [];
-    // Buscar la fila que contiene el total de Varios (primera fila con datos numéricos en cols B-M)
-    // La planilla tiene: col A = descripción, cols B-M = Ene-Dic
-    let found = false;
-    for (const row of rows) {
-      if (!row[0]) continue;
-      const label = row[0].toString().toLowerCase();
-      if (label.includes('total') || label.includes('varios')) {
-        const valores = [];
-        for (let i = 1; i <= 12; i++) {
-          const raw = (row[i] || '').toString().replace(/[$.]/g, '').replace(',', '.').trim();
-          const val = parseFloat(raw);
-          valores.push(isNaN(val) || val <= 0 ? 1_500_000 : val);
-        }
-        if (valores.some(v => v > 0)) {
-          presupuestosPorMes = valores;
-          found = true;
-          console.log('Presupuestos cargados:', presupuestosPorMes);
-          break;
-        }
-      }
+    // Intentar leer el nombre real de las pestañas primero
+    const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GASTOS_SHEET_ID}?fields=sheets.properties.title`;
+    const metaR = await fetch(metaUrl, { headers: { Authorization: 'Bearer ' + token } });
+    let sheetNames = [];
+    if (metaR.ok) {
+      const meta = await metaR.json();
+      sheetNames = (meta.sheets || []).map(s => s.properties.title);
     }
-    if (!found) {
-      // Intentar leer la primera fila de datos como fallback
-      // O leer desde pestaña "Categorías"
-      const url2 = `https://sheets.googleapis.com/v4/spreadsheets/${GASTOS_SHEET_ID}/values/${encodeURIComponent('Categorías!A:N')}`;
-      const r2 = await fetch(url2, { headers: { Authorization: 'Bearer ' + token } });
-      if (r2.ok) {
-        const d2 = await r2.json();
-        const rows2 = d2.values || [];
-        for (const row of rows2) {
-          if (!row[0]) continue;
-          const label = row[0].toString().toLowerCase();
-          if (label.includes('varios') || label.includes('total')) {
+
+    // Intentar cada pestaña candidata
+    const candidatas = ['Varios', 'varios', 'Categorías', 'Categorias', 'Resumen', ...sheetNames];
+    const intentadas = new Set();
+
+    for (const tab of candidatas) {
+      if (intentadas.has(tab)) continue;
+      intentadas.add(tab);
+      try {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GASTOS_SHEET_ID}/values/${encodeURIComponent(tab + '!A:N')}`;
+        const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        if (!r.ok) continue;
+        const d = await r.json();
+        const rows = d.values || [];
+        for (const row of rows) {
+          if (!row || !row[0]) continue;
+          const label = row[0].toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+          if (label.includes('varios') || label.includes('total varios')) {
             const valores = [];
             for (let i = 1; i <= 12; i++) {
-              const raw = (row[i] || '').toString().replace(/[$.]/g, '').replace(',', '.').trim();
+              const raw = (row[i] || '').toString().replace(/[$. ]/g, '').replace(',', '.').trim();
               const val = parseFloat(raw);
-              valores.push(isNaN(val) || val <= 0 ? 1_500_000 : val);
+              valores.push(isNaN(val) || val < 100000 ? FALLBACK[i-1] : val);
             }
-            if (valores.some(v => v > 0)) {
+            if (valores.some(v => v > 100000)) {
               presupuestosPorMes = valores;
-              break;
+              console.log('✓ Presupuestos cargados desde', tab, valores);
+              render(); // Re-renderizar con valores reales
+              return;
             }
           }
         }
-      }
+      } catch(e) { continue; }
     }
+    // Si no encontró nada, usar fallback
+    presupuestosPorMes = FALLBACK;
+    console.log('Usando presupuestos fallback');
   } catch(e) {
-    console.warn('No se pudo cargar presupuestos, usando fallback $1.500.000:', e);
+    presupuestosPorMes = FALLBACK;
+    console.warn('cargarPresupuestosPorMes falló, usando fallback:', e);
   }
 }
 
@@ -532,7 +541,7 @@ async function syncLoad(silent=false) {
     // Recargar presupuestos cada 5 sincronizaciones (~75 seg) para capturar cambios en la planilla
     if (!silent || !window._syncCount) window._syncCount = 0;
     window._syncCount++;
-    if (window._syncCount % 5 === 1) await cargarPresupuestosPorMes().catch(()=>{});
+    if (window._syncCount % 5 === 1) cargarPresupuestosPorMes().catch(()=>{}); // en paralelo
     gastos = await sheetsRead();
     syncStatus = 'ok';
     lastSync = new Date();
@@ -778,10 +787,12 @@ function setUsuario(u) {
   usuarioActivo = u;
   localStorage.setItem('usuario', u);
   setCookie('usuario', u);
+  // Iniciar siempre — presupuestos se cargan en paralelo sin bloquear
   sheetsInitHeader()
-    .then(() => cargarPresupuestosPorMes())
     .then(() => syncLoad())
     .catch(() => syncLoad());
+  // Presupuestos dinámicos: en paralelo, nunca bloquea el inicio
+  cargarPresupuestosPorMes().catch(() => {});
   render();
 }
 

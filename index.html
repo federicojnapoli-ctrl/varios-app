@@ -314,7 +314,7 @@ if ('serviceWorker' in navigator) {
 // APPS SCRIPT API — Sin OAuth, sin tokens, sin popups
 // La URL se configura una sola vez después de deployar el script
 // ══════════════════════════════════════════════════════
-let APPS_SCRIPT_URL = localStorage.getItem('apps_script_url') || '';
+let APPS_SCRIPT_URL = localStorage.getItem('apps_script_url') || 'https://script.google.com/macros/s/AKfycbwQIu_X1FVRfS9H1XDe9z6dbzuKvC7vtIgUMKn_ED3DOOBZZciGH63CIcZfYIX_8yZUZQ/exec';
 
 function setAppsScriptUrl(url) {
   APPS_SCRIPT_URL = url.trim();
@@ -327,23 +327,35 @@ function setAppsScriptUrl(url) {
 async function apiGet(params) {
   if (!APPS_SCRIPT_URL) throw new Error('URL no configurada');
   const url = APPS_SCRIPT_URL + '?' + new URLSearchParams(params);
-  const r = await fetch(url);
-  if (!r.ok) throw new Error('API error ' + r.status);
-  const d = await r.json();
+  let r;
+  try {
+    r = await fetch(url, { redirect: 'follow' });
+  } catch(e) {
+    throw new Error('Sin conexión: ' + e.message);
+  }
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' — verificá el deploy del script');
+  let d;
+  try { d = await r.json(); } catch(e) { throw new Error('Respuesta inválida del script'); }
   if (d.error) throw new Error(d.error);
   return d;
 }
 
 async function apiPost(body) {
   if (!APPS_SCRIPT_URL) throw new Error('URL no configurada');
-  const r = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body),
-    redirect: 'follow',
-  });
-  if (!r.ok) throw new Error('API error ' + r.status);
-  const d = await r.json();
+  let r;
+  try {
+    r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'}, // Apps Script requiere text/plain para evitar CORS preflight
+      body: JSON.stringify(body),
+      redirect: 'follow',
+    });
+  } catch(e) {
+    throw new Error('Sin conexión: ' + e.message);
+  }
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  let d;
+  try { d = await r.json(); } catch(e) { throw new Error('Respuesta inválida'); }
   if (d.error) throw new Error(d.error);
   return d;
 }
@@ -426,7 +438,8 @@ async function syncLoad(silent=false) {
       syncStatus = 'setup';
     } else {
       syncStatus = 'err';
-      if (!silent) showToast('⚠️ Error: ' + String(e).slice(0,60));
+      console.error('Sync error completo:', e);
+      if (!silent) showToast('⚠️ ' + String(e).slice(0,80));
     }
     renderSyncBar();
   }
@@ -444,8 +457,8 @@ function renderSyncBar() {
     el.innerHTML = `<div class="sync-dot err"></div><span style="color:var(--red);font-weight:600">Falta configurar URL</span><button onclick="mostrarSetup()" style="margin-left:auto;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">⚙️ Configurar</button>`;
     return;
   }
-  const labels = { ok: lastSync ? `✓ ${lastSync.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}` : 'Conectado', syncing:'Sincronizando...', err:'Sin conexión' };
-  el.innerHTML = `<div class="sync-dot ${syncStatus}"></div><span>${labels[syncStatus]||''}</span><button onclick="syncLoad()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted)">↺</button>`;
+  const labels = { ok: lastSync ? `✓ ${lastSync.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}` : 'Conectado', syncing:'Sincronizando...', err:'Error — tocá ↺' };
+  el.innerHTML = `<div class="sync-dot ${syncStatus}"></div><span style="color:${syncStatus==='err'?'var(--red)':''}">${labels[syncStatus]||''}</span><button onclick="syncLoad()" style="margin-left:auto;background:${syncStatus==='err'?'var(--red)':'none'};color:${syncStatus==='err'?'#fff':'var(--muted)'};border:none;border-radius:${syncStatus==='err'?'8px':'0'};padding:${syncStatus==='err'?'4px 10px':'0'};cursor:pointer;font-size:11px;font-weight:${syncStatus==='err'?'600':'400'};font-family:inherit">↺ Reintentar</button>`;
 }
 
 function mostrarSetup() {

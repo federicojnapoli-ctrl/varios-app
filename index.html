@@ -710,7 +710,7 @@ function renderSemana(gs, totSem, saldoSem, totFedeSem, totDaiSem) {
   const semanasRestantes = Math.max(1, TOTAL_SEMANAS - semActiva + 1);
   // Descuento que aplica a ESTA semana y a las siguientes (equitativo)
   const descuentoSemana = Math.round(excesoAcumulado / semanasRestantes);
-  // semanalMes ya está definido arriba en el bloque de exceso
+  const semanalMes = presupuestoSemanal(mesActivo);
   const topeSem  = Math.max(0, semanalMes - descuentoSemana);
   const topeFede = Math.max(0, topeSem / 2);
   const topeDai  = Math.max(0, topeSem / 2);

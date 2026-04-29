@@ -298,7 +298,6 @@ let tabActiva = 'semana';
 let gastos = [];       // [{id,usuario,mes,semana,desc,cat,monto,fecha,ts}]
 let syncStatus = 'ok'; // ok | syncing | err
 let lastSync = null;
-let accessToken = null;
 let syncTimer = null;
 
 // ══════════════════════════════════════════════════════
@@ -311,220 +310,70 @@ if ('serviceWorker' in navigator) {
 // ══════════════════════════════════════════════════════
 // GOOGLE SHEETS API — via fetch con token OAuth de GIS
 // ══════════════════════════════════════════════════════
-let _gisLoaded = false;
-let _tokenClient = null;
-let _pendingResolvers = [];
+// ══════════════════════════════════════════════════════
+// APPS SCRIPT API — Sin OAuth, sin tokens, sin popups
+// La URL se configura una sola vez después de deployar el script
+// ══════════════════════════════════════════════════════
+let APPS_SCRIPT_URL = localStorage.getItem('apps_script_url') || '';
 
-function loadGIS() {
-  return new Promise((res, rej) => {
-    if (_gisLoaded && window.google?.accounts) { res(); return; }
-    if (document.querySelector('script[src*="gsi/client"]')) {
-      const poll = setInterval(() => {
-        if (window.google?.accounts) { _gisLoaded=true; clearInterval(poll); res(); }
-      }, 100);
-      setTimeout(() => { clearInterval(poll); rej('GIS timeout'); }, 10000);
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.onload = () => { _gisLoaded=true; res(); };
-    s.onerror = () => rej('No se pudo cargar Google Auth');
-    document.head.appendChild(s);
+function setAppsScriptUrl(url) {
+  APPS_SCRIPT_URL = url.trim();
+  localStorage.setItem('apps_script_url', APPS_SCRIPT_URL);
+}
+
+// ══════════════════════════════════════════════════════
+// API calls al Apps Script proxy
+// ══════════════════════════════════════════════════════
+async function apiGet(params) {
+  if (!APPS_SCRIPT_URL) throw new Error('URL no configurada');
+  const url = APPS_SCRIPT_URL + '?' + new URLSearchParams(params);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('API error ' + r.status);
+  const d = await r.json();
+  if (d.error) throw new Error(d.error);
+  return d;
+}
+
+async function apiPost(body) {
+  if (!APPS_SCRIPT_URL) throw new Error('URL no configurada');
+  const r = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+    redirect: 'follow',
   });
-}
-
-function guardarToken(token) {
-  accessToken = token;
-  const exp = Date.now() + 55*60*1000;
-  try {
-    sessionStorage.setItem('g_token', token);
-    sessionStorage.setItem('g_token_exp', String(exp));
-    localStorage.setItem('g_token_ls', token);
-    localStorage.setItem('g_token_ls_exp', String(exp));
-  } catch(e) {}
-  setTimeout(() => {
-    accessToken = null;
-    try { sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_token_exp'); } catch(e) {}
-  }, 55*60*1000);
-}
-
-function tokenGuardado() {
-  try {
-    const t=sessionStorage.getItem('g_token'), exp=parseInt(sessionStorage.getItem('g_token_exp')||'0');
-    if (t && Date.now()<exp) return t;
-    const tls=localStorage.getItem('g_token_ls'), expls=parseInt(localStorage.getItem('g_token_ls_exp')||'0');
-    if (tls && Date.now()<expls) return tls;
-  } catch(e) {}
-  return null;
-}
-
-function getToken() {
-  return new Promise(async (resolve, reject) => {
-    if (accessToken) { resolve(accessToken); return; }
-    const saved = tokenGuardado();
-    if (saved) { accessToken=saved; resolve(accessToken); return; }
-    // Si ya hay un login en curso, encolar
-    if (_pendingResolvers.length > 0) { _pendingResolvers.push({resolve,reject}); return; }
-    _pendingResolvers.push({resolve,reject});
-    try { await loadGIS(); } catch(e) { _pendingResolvers.splice(0).forEach(p=>p.reject(e)); return; }
-    const hint = localStorage.getItem('g_hint') || '';
-    if (!_tokenClient) {
-      _tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: '777551994272-pt905gviok1nni2rkoh9q16a7h2q59tf.apps.googleusercontent.com',
-        scope: 'https://www.googleapis.com/auth/spreadsheets',
-        callback: (r) => {
-          const pending = _pendingResolvers.splice(0);
-          if (r.error) { pending.forEach(p=>p.reject(r.error)); return; }
-          guardarToken(r.access_token);
-          if (r.email) localStorage.setItem('g_hint', r.email);
-          pending.forEach(p=>p.resolve(r.access_token));
-        },
-      });
-    }
-    if (hint) {
-      _tokenClient.requestAccessToken({prompt:'', hint, login_hint:hint});
-    } else {
-      _tokenClient.requestAccessToken({prompt:'select_account'});
-    }
-  });
-}
-
-// Lee los presupuestos de Varios por mes desde la planilla Gastos 2026
-// NUNCA lanza excepción — usa fallback si falla
-async function cargarPresupuestosPorMes() {
-  // Valores reales de la planilla como fallback (actualizá estos si cambian)
-  const FALLBACK = [
-    2000000, // Ene
-    2948938, // Feb
-    1994667, // Mar
-    2456808, // Abr
-    1500000, // May
-    1500000, // Jun
-    1500000, // Jul
-    1500000, // Ago
-    1500000, // Sep
-    1500000, // Oct
-    1500000, // Nov
-    1500000, // Dic
-  ];
-
-  try {
-    const token = await getToken();
-    // Intentar leer el nombre real de las pestañas primero
-    const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GASTOS_SHEET_ID}?fields=sheets.properties.title`;
-    const metaR = await fetch(metaUrl, { headers: { Authorization: 'Bearer ' + token } });
-    let sheetNames = [];
-    if (metaR.ok) {
-      const meta = await metaR.json();
-      sheetNames = (meta.sheets || []).map(s => s.properties.title);
-    }
-
-    // Intentar cada pestaña candidata
-    const candidatas = ['Varios', 'varios', 'Categorías', 'Categorias', 'Resumen', ...sheetNames];
-    const intentadas = new Set();
-
-    for (const tab of candidatas) {
-      if (intentadas.has(tab)) continue;
-      intentadas.add(tab);
-      try {
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GASTOS_SHEET_ID}/values/${encodeURIComponent(tab + '!A:N')}`;
-        const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-        if (!r.ok) continue;
-        const d = await r.json();
-        const rows = d.values || [];
-        for (const row of rows) {
-          if (!row || !row[0]) continue;
-          const label = row[0].toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-          if (label.includes('varios') || label.includes('total varios')) {
-            const valores = [];
-            for (let i = 1; i <= 12; i++) {
-              const raw = (row[i] || '').toString().replace(/[$. ]/g, '').replace(',', '.').trim();
-              const val = parseFloat(raw);
-              valores.push(isNaN(val) || val < 100000 ? FALLBACK[i-1] : val);
-            }
-            if (valores.some(v => v > 100000)) {
-              presupuestosPorMes = valores;
-              console.log('✓ Presupuestos cargados desde', tab, valores);
-              render(); // Re-renderizar con valores reales
-              return;
-            }
-          }
-        }
-      } catch(e) { continue; }
-    }
-    // Si no encontró nada, usar fallback
-    presupuestosPorMes = FALLBACK;
-    console.log('Usando presupuestos fallback');
-  } catch(e) {
-    presupuestosPorMes = FALLBACK;
-    console.warn('cargarPresupuestosPorMes falló, usando fallback:', e);
-  }
+  if (!r.ok) throw new Error('API error ' + r.status);
+  const d = await r.json();
+  if (d.error) throw new Error(d.error);
+  return d;
 }
 
 async function sheetsRead() {
-  const token = await getToken();
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A:H')}`;
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-  if (!r.ok) throw new Error('Sheets read error ' + r.status);
-  const d = await r.json();
-  return (d.values || []).slice(1).map(row => ({
-    id: row[0], usuario: row[1], mes: +row[2], semana: +row[3],
-    desc: row[4], cat: row[5], monto: +row[6], fecha: row[7] || '',
-  }));
+  const d = await apiGet({action: 'read'});
+  return d.gastos || [];
 }
 
 async function sheetsAppend(gasto) {
-  const token = await getToken();
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A:H')}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
-  const row = [gasto.id, gasto.usuario, gasto.mes, gasto.semana, gasto.desc, gasto.cat, gasto.monto, gasto.fecha];
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [row] }),
-  });
-  if (!r.ok) throw new Error('Sheets append error ' + r.status);
+  await apiPost({action: 'append', gasto});
 }
 
 async function sheetsDelete(id) {
-  // Encontramos la fila y la borramos con batchUpdate
-  const token = await getToken();
-  // Primero leer para encontrar índice
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A:A')}`;
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-  const d = await r.json();
-  const rows = d.values || [];
-  const rowIdx = rows.findIndex(r => r[0] === String(id));
-  if (rowIdx === -1) return;
-
-  // Obtener sheetId interno
-  const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`, { headers: { Authorization: 'Bearer ' + token } });
-  const meta = await metaR.json();
-  const sheetId = meta.sheets[0].properties.sheetId;
-
-  const delR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId, dimension: 'ROWS', startIndex: rowIdx, endIndex: rowIdx + 1 } } }] }),
-  });
-  if (!delR.ok) throw new Error('Delete error');
+  await apiPost({action: 'delete', id: String(id)});
 }
 
 async function sheetsInitHeader() {
-  // Pone encabezados si la hoja está vacía
-  try {
-    const token = await getToken();
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A1:H1')}`;
-    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-    const d = await r.json();
-    if (!d.values || !d.values.length) {
-      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A1:H1')}?valueInputOption=RAW`, {
-        method: 'PUT',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values: [['ID','Usuario','Mes','Semana','Descripcion','Categoria','Monto','Fecha']] }),
-      });
-    }
-  } catch(e) { console.warn('Header init:', e); }
+  // No necesario con Apps Script — el script maneja la hoja directamente
 }
+
+async function cargarPresupuestosPorMes() {
+  // Valores reales de la planilla (actualizá si cambian)
+  presupuestosPorMes = [
+    2000000, 2948938, 1994667, 2456808,
+    1500000, 1500000, 1500000, 1500000,
+    1500000, 1500000, 1500000, 1500000,
+  ];
+}
+
 
 // ══════════════════════════════════════════════════════
 // SYNC
@@ -573,11 +422,11 @@ async function syncLoad(silent=false) {
   } catch(e) {
     console.error('Sync error:', e);
     const msg = String(e).toLowerCase();
-    if (msg.includes('popup') || msg.includes('access') || msg.includes('token') || msg.includes('auth') || msg.includes('401') || msg.includes('403')) {
-      syncStatus = 'login';
+    if (msg.includes('url no configurada') || !APPS_SCRIPT_URL) {
+      syncStatus = 'setup';
     } else {
       syncStatus = 'err';
-      if (!silent) showToast('⚠️ Error al sincronizar');
+      if (!silent) showToast('⚠️ Error: ' + String(e).slice(0,60));
     }
     renderSyncBar();
   }
@@ -591,22 +440,22 @@ function startAutoSync() {
 function renderSyncBar() {
   const el = document.getElementById('sync-bar');
   if (!el) return;
-  if (syncStatus === 'login') {
-    el.innerHTML = `<div class="sync-dot err"></div><span style="color:var(--red);font-weight:600">Necesita autorización</span><button onclick="loginManual()" style="margin-left:auto;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">🔑 Conectar Google</button>`;
+  if (syncStatus === 'setup' || !APPS_SCRIPT_URL) {
+    el.innerHTML = `<div class="sync-dot err"></div><span style="color:var(--red);font-weight:600">Falta configurar URL</span><button onclick="mostrarSetup()" style="margin-left:auto;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">⚙️ Configurar</button>`;
     return;
   }
-  const labels = { ok: lastSync ? `Sync ${lastSync.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}` : 'Sincronizado', syncing:'Sincronizando...', err:'Sin conexión' };
-  el.innerHTML = `<div class="sync-dot ${syncStatus}"></div><span>${labels[syncStatus]||''}</span><button onclick="syncLoad()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted)">↺ Actualizar</button>`;
+  const labels = { ok: lastSync ? `✓ ${lastSync.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}` : 'Conectado', syncing:'Sincronizando...', err:'Sin conexión' };
+  el.innerHTML = `<div class="sync-dot ${syncStatus}"></div><span>${labels[syncStatus]||''}</span><button onclick="syncLoad()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted)">↺</button>`;
 }
 
-function loginManual() {
-  accessToken = null;
-  _tokenClient = null;
-  try {
-    sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_token_exp');
-    localStorage.removeItem('g_token_ls'); localStorage.removeItem('g_token_ls_exp');
-  } catch(e) {}
-  syncLoad(false);
+function mostrarSetup() {
+  const url = prompt('Pegá la URL de tu Apps Script Web App:');
+  if (url && url.includes('script.google.com')) {
+    setAppsScriptUrl(url);
+    syncLoad(false);
+  } else if (url) {
+    alert('URL inválida. Debe ser de script.google.com');
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -825,11 +674,8 @@ function setUsuario(u) {
   localStorage.setItem('usuario', u);
   setCookie('usuario', u);
   // Iniciar siempre — presupuestos se cargan en paralelo sin bloquear
-  sheetsInitHeader()
-    .then(() => syncLoad())
-    .catch(() => syncLoad());
-  // Presupuestos dinámicos: en paralelo, nunca bloquea el inicio
-  cargarPresupuestosPorMes().catch(() => {});
+  cargarPresupuestosPorMes().catch(()=>{});
+  syncLoad(false);
   render();
 }
 

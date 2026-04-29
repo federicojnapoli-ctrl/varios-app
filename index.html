@@ -575,7 +575,7 @@ function render() {
   const totMes = totalOf(gsMes);
   const totSem = totalOf(gsSem);
   const saldoMes = getPRESUPUESTO() - totMes;
-  const saldoSem = SEMANAL - totSem;
+  const saldoSem = getSEMANAL() - totSem;
   const presupuestoActual = getPRESUPUESTO();
   const semanalActual = getSEMANAL();
   const ahorroProy = Math.max(0, saldoMes);
@@ -867,7 +867,7 @@ function renderMes(gm, totMes, saldoMes, ahorroProy, pctAhorro, totFede, totDai)
   const pctD = 100-pctF;
 
   const catBars = ['A','B','C'].map(c=>{
-    const cat=CATS[c], g=totCat[c]||0, t=PRESUPUESTO*cat.tope, p=pct(g,t), over=g>t;
+    const cat=CATS[c], g=totCat[c]||0, t=presupuestoActual*cat.tope, p=pct(g,t), over=g>t;
     return `<div style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
         <span style="font-weight:700;color:${cat.color}">${c}: ${cat.label}</span>
@@ -882,16 +882,16 @@ function renderMes(gm, totMes, saldoMes, ahorroProy, pctAhorro, totFede, totDai)
   }).join('');
 
   const semRows = [1,2,3,4,5].map(s=>{
-    const gs=filtrar(mesActivo,s), tot=totalOf(gs), p=pct(tot,SEMANAL);
+    const _sem=getSEMANAL(); const gs=filtrar(mesActivo,s), tot=totalOf(gs), p=pct(tot,_sem);
     const gF=totalOf(filtrar(mesActivo,s,'fede')), gD=totalOf(filtrar(mesActivo,s,'dai'));
     const pF=tot>0?pct(gF,tot):0, pD=tot>0?pct(gD,tot):0;
     return `<div style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
         <span style="font-weight:600">Semana ${s}</span>
-        <span style="color:${tot>SEMANAL?'var(--red)':'var(--muted)'};font-weight:600">${fmt(tot)}</span>
+        <span style="color:${tot>_sem?'var(--red)':'var(--muted)'};font-weight:600">${fmt(tot)}</span>
       </div>
       <div class="prog-wrap" style="height:7px;margin-bottom:6px">
-        <div class="prog-fill" style="width:${p}%;background:${tot>SEMANAL?'var(--red)':'var(--navy2)'}"></div>
+        <div class="prog-fill" style="width:${p}%;background:${tot>_sem?'var(--red)':'var(--navy2)'}"></div>
       </div>
       ${tot>0?`<div class="split-bar-track" style="height:5px;border-radius:99px">
         <div style="width:${pF}%;background:var(--fede);border-radius:99px 0 0 99px"></div>
@@ -905,7 +905,7 @@ function renderMes(gm, totMes, saldoMes, ahorroProy, pctAhorro, totFede, totDai)
       <div class="card-label">Resumen ${MESES[mesActivo]}</div>
       <div style="display:flex;gap:14px;margin-bottom:14px">
         <div><div style="font-size:11px;color:var(--muted)">Presupuesto</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800">${fmt(presupuestoActual)}</div></div>
-        <div><div style="font-size:11px;color:var(--muted)">Gastado</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:${totMes>PRESUPUESTO?'var(--red)':'var(--navy)'}">${fmt(totMes)}</div></div>
+        <div><div style="font-size:11px;color:var(--muted)">Gastado</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:${totMes>presupuestoActual?'var(--red)':'var(--navy)'}">${fmt(totMes)}</div></div>
         <div><div style="font-size:11px;color:var(--muted)">Saldo</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:${saldoMes<0?'var(--red)':'var(--green)'}">${fmt(saldoMes)}</div></div>
       </div>
       <div class="prog-wrap" style="height:10px">
@@ -969,7 +969,7 @@ function renderGuia() {
   const catCards = Object.entries(CATS).map(([k,v])=>`
     <div class="guia-cat" style="background:${v.bg};border-left:4px solid ${v.color}">
       <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:${v.color};margin-bottom:4px">
-        ${k}: ${v.label} — ${Math.round(v.tope*100)}% (${fmt(PRESUPUESTO*v.tope)}/mes)
+        ${k}: ${v.label} — ${Math.round(v.tope*100)}% (${fmt(getPRESUPUESTO()*v.tope)}/mes)
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
         ${ejemplos[k].map(e=>`<span class="guia-tag" style="background:#fff;border:1px solid ${v.color}33;color:${v.color}">${e}</span>`).join('')}

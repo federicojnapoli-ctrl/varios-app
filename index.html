@@ -252,9 +252,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text
 // ══════════════════════════════════════════════════════
 const SHEET_ID = '1x3FVibkIEfbv40CPP0WQEfoWPA-LqCtrAtfn1RlwCqU';
 const SHEET_NAME = 'Hoja 1';
-const PRESUPUESTO = 1_500_000;
-const SEMANAL = 300_000; // 1.500.000 / 5 semanas
-const INGRESOS = 4_863_083; // Fede 1.863.083 + Dai 3.000.000
+const GASTOS_SHEET_ID = '1yt7M8S9ZFg-eNw6Uj0nf_Ywd18MzWrZejzipSd6iXqY';
+const TOTAL_SEMANAS_MES = 5;
+const INGRESOS = 4_863_083;
+// Presupuestos por mes — se cargan dinámicamente desde la planilla
+// Fallback: $1.500.000 si no se puede leer
+let presupuestosPorMes = Array(12).fill(1_500_000);
+
+// Devuelve el presupuesto mensual de "Varios" para un mes dado
+function presupuestoMes(mes) {
+  return presupuestosPorMes[mes] || 1_500_000;
+}
+function presupuestoSemanal(mes) {
+  return Math.round(presupuestoMes(mes) / TOTAL_SEMANAS_MES);
+}
+// Compatibilidad: PRESUPUESTO y SEMANAL del mes activo
+function getPRESUPUESTO() { return presupuestoMes(mesActivo); }
+function getSEMANAL()     { return presupuestoSemanal(mesActivo); }
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MESES_S = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const USUARIOS = { fede: { label:'Fede', color:'var(--fede)', bg:'var(--fede-lt)' }, dai: { label:'Dai', color:'var(--dai)', bg:'var(--dai-lt)' } };
@@ -355,6 +369,69 @@ function getToken() {
   });
 }
 
+// Lee los presupuestos de Varios por mes desde la planilla Gastos 2026
+async function cargarPresupuestosPorMes() {
+  try {
+    const token = await getToken();
+    // Leer la pestaña "Varios" de la planilla Gastos 2026
+    // Buscamos la fila "Total Varios" o "Varios" y tomamos los 12 meses
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${GASTOS_SHEET_ID}/values/${encodeURIComponent('Varios!A:N')}`;
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) throw new Error('No se pudo leer presupuestos');
+    const d = await r.json();
+    const rows = d.values || [];
+    // Buscar la fila que contiene el total de Varios (primera fila con datos numéricos en cols B-M)
+    // La planilla tiene: col A = descripción, cols B-M = Ene-Dic
+    let found = false;
+    for (const row of rows) {
+      if (!row[0]) continue;
+      const label = row[0].toString().toLowerCase();
+      if (label.includes('total') || label.includes('varios')) {
+        const valores = [];
+        for (let i = 1; i <= 12; i++) {
+          const raw = (row[i] || '').toString().replace(/[$.]/g, '').replace(',', '.').trim();
+          const val = parseFloat(raw);
+          valores.push(isNaN(val) || val <= 0 ? 1_500_000 : val);
+        }
+        if (valores.some(v => v > 0)) {
+          presupuestosPorMes = valores;
+          found = true;
+          console.log('Presupuestos cargados:', presupuestosPorMes);
+          break;
+        }
+      }
+    }
+    if (!found) {
+      // Intentar leer la primera fila de datos como fallback
+      // O leer desde pestaña "Categorías"
+      const url2 = `https://sheets.googleapis.com/v4/spreadsheets/${GASTOS_SHEET_ID}/values/${encodeURIComponent('Categorías!A:N')}`;
+      const r2 = await fetch(url2, { headers: { Authorization: 'Bearer ' + token } });
+      if (r2.ok) {
+        const d2 = await r2.json();
+        const rows2 = d2.values || [];
+        for (const row of rows2) {
+          if (!row[0]) continue;
+          const label = row[0].toString().toLowerCase();
+          if (label.includes('varios') || label.includes('total')) {
+            const valores = [];
+            for (let i = 1; i <= 12; i++) {
+              const raw = (row[i] || '').toString().replace(/[$.]/g, '').replace(',', '.').trim();
+              const val = parseFloat(raw);
+              valores.push(isNaN(val) || val <= 0 ? 1_500_000 : val);
+            }
+            if (valores.some(v => v > 0)) {
+              presupuestosPorMes = valores;
+              break;
+            }
+          }
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('No se pudo cargar presupuestos, usando fallback $1.500.000:', e);
+  }
+}
+
 async function sheetsRead() {
   const token = await getToken();
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME + '!A:H')}`;
@@ -452,6 +529,10 @@ async function syncLoad(silent=false) {
   try {
     if (!silent) { syncStatus = 'syncing'; renderSyncBar(); }
     const formState = silent ? preservarForm() : null;
+    // Recargar presupuestos cada 5 sincronizaciones (~75 seg) para capturar cambios en la planilla
+    if (!silent || !window._syncCount) window._syncCount = 0;
+    window._syncCount++;
+    if (window._syncCount % 5 === 1) await cargarPresupuestosPorMes().catch(()=>{});
     gastos = await sheetsRead();
     syncStatus = 'ok';
     lastSync = new Date();
@@ -585,10 +666,13 @@ function render() {
   const gsSem = filtrar(mesActivo, semActiva);
   const totMes = totalOf(gsMes);
   const totSem = totalOf(gsSem);
-  const saldoMes = PRESUPUESTO - totMes;
+  const saldoMes = getPRESUPUESTO() - totMes;
   const saldoSem = SEMANAL - totSem;
+  const presupuestoActual = getPRESUPUESTO();
+  const semanalActual = getSEMANAL();
   const ahorroProy = Math.max(0, saldoMes);
   const pctAhorro = pct(ahorroProy, INGRESOS);
+  const saldoMesHdr = saldoMes;
 
   // Stats por usuario
   const totFede = totalOf(filtrarMes(mesActivo,'fede'));
@@ -596,21 +680,21 @@ function render() {
   const totFedeSem = totalOf(filtrar(mesActivo,semActiva,'fede'));
   const totDaiSem = totalOf(filtrar(mesActivo,semActiva,'dai'));
 
-  const headerSaldoColor = saldoMes<0?'#fca5a5':totMes>PRESUPUESTO*.85?'#fde68a':'#86efac';
+  const headerSaldoColor = saldoMes<0?'#fca5a5':totMes>presupuestoActual*.85?'#fde68a':'#86efac';
 
   document.getElementById('app').innerHTML = `
     <div class="header">
       <div class="header-row1">
         <div>
           <div class="header-title">Control de Varios</div>
-          <div class="header-sub">$1.500.000/mes · $300.000/sem</div>
+          <div class="header-sub">${fmt(presupuestoActual)}/mes · ${fmt(semanalActual)}/sem</div>
         </div>
         <button class="mes-badge" onclick="openMesModal()">${MESES_S[mesActivo]} ▾</button>
       </div>
       <div class="hstats">
         <div class="hstat">
           <div class="hstat-label">Gastado mes</div>
-          <div class="hstat-val" style="color:${totMes>PRESUPUESTO?'#fca5a5':'#fff'}">${fmt(totMes)}</div>
+          <div class="hstat-val" style="color:${totMes>presupuestoActual?'#fca5a5':'#fff'}">${fmt(totMes)}</div>
         </div>
         <div class="hstat">
           <div class="hstat-label">Saldo mes</div>
@@ -618,7 +702,7 @@ function render() {
         </div>
         <div class="hstat">
           <div class="hstat-label">Gastado semana</div>
-          <div class="hstat-val" style="color:${totSem>SEMANAL?'#fca5a5':'#fff'}">${fmt(totSem)}</div>
+          <div class="hstat-val" style="color:${totSem>semanalActual?'#fca5a5':'#fff'}">${fmt(totSem)}</div>
         </div>
         <div class="hstat">
           <div class="hstat-label">Ahorro proy.</div>
@@ -694,7 +778,10 @@ function setUsuario(u) {
   usuarioActivo = u;
   localStorage.setItem('usuario', u);
   setCookie('usuario', u);
-  sheetsInitHeader().then(() => syncLoad()).catch(() => syncLoad());
+  sheetsInitHeader()
+    .then(() => cargarPresupuestosPorMes())
+    .then(() => syncLoad())
+    .catch(() => syncLoad());
   render();
 }
 
@@ -702,26 +789,28 @@ function setTab(t) { tabActiva=t; render(); }
 
 // ── SEMANA ──
 function renderSemana(gs, totSem, saldoSem, totFedeSem, totDaiSem) {
-  // Cálculo de exceso acumulado de semanas anteriores
-  // Regla: el exceso es de la PAREJA y se divide entre las semanas restantes.
-  // Se descuenta igual a Fede y a Dai.
+  // ═══ Exceso equitativo ═══
+  // El exceso de la PAREJA en semanas previas se distribuye:
+  //   a) en partes iguales entre las semanas SIGUIENTES (sem actual en adelante)
+  //   b) ese descuento semanal se divide ÷2 para cada persona
   const TOTAL_SEMANAS = 5;
-  let excesoAcumulado = 0; // exceso total de la pareja en semanas previas
+  let excesoAcumulado = 0;
   for (let s = 1; s < semActiva; s++) {
     const tot = totalOf(filtrar(mesActivo, s));
-    if (tot > SEMANAL) excesoAcumulado += (tot - SEMANAL);
+    const sAnalizada = presupuestoSemanal(mesActivo); // tope real del mes
+    if (tot > sAnalizada) excesoAcumulado += (tot - sAnalizada);
   }
-  // Semanas que quedan desde la semana actual hasta el fin del mes (inclusive)
-  const semanasRestantes = TOTAL_SEMANAS - semActiva + 1;
-  // El exceso se distribuye en partes iguales entre las semanas restantes
-  const descuentoEstaSemana = semanasRestantes > 0 ? Math.round(excesoAcumulado / semanasRestantes) : 0;
-  const topeSem   = Math.max(0, SEMANAL - descuentoEstaSemana);
-  const topeFede  = Math.max(0, topeSem / 2);
-  const topeDai   = Math.max(0, topeSem / 2);
+  const semanasRestantes = Math.max(1, TOTAL_SEMANAS - semActiva + 1);
+  // Descuento que aplica a ESTA semana y a las siguientes (equitativo)
+  const descuentoSemana = Math.round(excesoAcumulado / semanasRestantes);
+  // semanalMes ya está definido arriba en el bloque de exceso
+  const topeSem  = Math.max(0, semanalMes - descuentoSemana);
+  const topeFede = Math.max(0, topeSem / 2);
+  const topeDai  = Math.max(0, topeSem / 2);
   saldoSem = topeSem - totSem;
-  const ajustePareja = descuentoEstaSemana; // para mostrar en UI
-  const ajusteFede   = Math.round(descuentoEstaSemana / 2);
-  const ajusteDai    = Math.round(descuentoEstaSemana / 2);
+  const ajustePareja = descuentoSemana;
+  const ajusteFede   = Math.round(descuentoSemana / 2);
+  const ajusteDai    = Math.round(descuentoSemana / 2);
   const sobraFede = topeFede - totFedeSem;
   const sobraDai  = topeDai  - totDaiSem;
   const pctSem = pct(totSem, topeSem || 1);
@@ -863,7 +952,7 @@ function setSem(s) { semActiva=s; render(); }
 
 // ── MES ──
 function renderMes(gm, totMes, saldoMes, ahorroProy, pctAhorro, totFede, totDai) {
-  const pctMes = pct(totMes, PRESUPUESTO);
+  const pctMes = pct(totMes, presupuestoActual);
   const totCat = {A:0,B:0,C:0};
   gm.forEach(g=>{totCat[g.cat]=(totCat[g.cat]||0)+g.monto;});
 
@@ -908,14 +997,14 @@ function renderMes(gm, totMes, saldoMes, ahorroProy, pctAhorro, totFede, totDai)
     <div class="card">
       <div class="card-label">Resumen ${MESES[mesActivo]}</div>
       <div style="display:flex;gap:14px;margin-bottom:14px">
-        <div><div style="font-size:11px;color:var(--muted)">Presupuesto</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800">${fmt(PRESUPUESTO)}</div></div>
+        <div><div style="font-size:11px;color:var(--muted)">Presupuesto</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800">${fmt(presupuestoActual)}</div></div>
         <div><div style="font-size:11px;color:var(--muted)">Gastado</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:${totMes>PRESUPUESTO?'var(--red)':'var(--navy)'}">${fmt(totMes)}</div></div>
         <div><div style="font-size:11px;color:var(--muted)">Saldo</div><div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:${saldoMes<0?'var(--red)':'var(--green)'}">${fmt(saldoMes)}</div></div>
       </div>
       <div class="prog-wrap" style="height:10px">
-        <div class="prog-fill" style="width:${pctMes}%;background:${totMes>PRESUPUESTO?'var(--red)':'var(--navy)'}"></div>
+        <div class="prog-fill" style="width:${pctMes}%;background:${totMes>presupuestoActual?'var(--red)':'var(--navy)'}"></div>
       </div>
-      <div style="text-align:right;font-size:12px;color:var(--muted);margin-top:4px">${pctMes}% del presupuesto</div>
+      <div style="text-align:right;font-size:12px;color:var(--muted);margin-top:4px">${pctMes}% · ${fmt(presupuestoActual)}</div>
     </div>
 
     <!-- SPLIT MENSUAL FEDE vs DAI -->

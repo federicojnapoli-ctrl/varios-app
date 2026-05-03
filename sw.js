@@ -1,4 +1,4 @@
-const CACHE = 'varios-v6';
+const CACHE = 'varios-v7';
 const ASSETS = [
   '/varios-app/',
   '/varios-app/index.html',

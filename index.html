@@ -426,7 +426,7 @@ async function syncLoad(silent=false) {
     const formState = silent ? preservarForm() : null;
     if (!silent || !window._syncCount) window._syncCount = 0;
     window._syncCount++;
-    if (window._syncCount % 5 === 1) cargarPresupuestosPorMes().catch(()=>{});
+    cargarPresupuestosPorMes().catch(()=>{}); // recarga en cada sync para capturar cambios en la planilla
     gastos = await sheetsRead();
     syncStatus = 'ok';
     lastSync = new Date();
